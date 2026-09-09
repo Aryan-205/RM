@@ -56,6 +56,54 @@ def generateProjectileData(numSamples, v0, theta, y0):
     return df
 
 
+def generateProjectileDataset(numSamples, seed=42):
+    """
+    Generate an ML-ready projectile dataset.
+
+    Each row = one random (v0, theta, y0, t) input combination and
+    the resulting (x, y) position. Rows are independent samples, not
+    points along a single trajectory, so the model sees how x and y
+    vary WITH v0, theta, y0 -- not just with t.
+
+    Parameters:
+        numSamples : number of rows to generate
+
+    Returns:
+        pandas DataFrame with columns v0, theta, y0, t, x, y
+    """
+
+    rng = np.random.default_rng(seed)
+
+    # Feature ranges -- keep them physically reasonable
+    v0 = rng.uniform(5, 50, numSamples)        # m/s
+    theta = rng.uniform(np.deg2rad(5), np.deg2rad(85), numSamples)  # rad
+    y0 = rng.uniform(0, 20, numSamples)        # m
+
+    # Time of flight for each sample (when y returns to 0)
+    timeOfFlight = (
+        v0 * np.sin(theta)
+        + np.sqrt((v0 * np.sin(theta)) ** 2 + 2 * g * y0)
+    ) / g
+
+    # Pick t randomly within [0, timeOfFlight] for each sample
+    # so t is a feature too, not the sweep variable.
+    t = rng.uniform(0, timeOfFlight)
+
+    x = v0 * np.cos(theta) * t
+    y = y0 + v0 * np.sin(theta) * t - 0.5 * g * t**2
+
+    df = pd.DataFrame({
+        "v0": v0,
+        "theta": theta,
+        "y0": y0,
+        "t": t,
+        "x": x,
+        "y": y
+    })
+
+    return df
+
+
 def plotProjectileData(dataset):
     """
     Plot the projectile trajectory.
@@ -79,25 +127,18 @@ def plotProjectileData(dataset):
 
 if __name__ == "__main__":
 
-    # Generate projectile data
-    dataset = generateProjectileData(
-        numSamples=100,
-        v0=10,
-        theta=np.pi / 4,
-        y0=0
-    )
+    # Generate ML dataset: many random (v0, theta, y0, t) -> (x, y) rows
+    dataset = generateProjectileDataset(numSamples=2000)
 
     # Display first few rows
     print(dataset.head())
 
-    # Plot trajectory
-    plotProjectileData(dataset)
-
     # Save dataset
     dataset.to_csv(
-        "../projectile.csv",
+        "../projectile_dataset.csv",
         index=False
     )
 
     print("\nDataset generated successfully.")
-    print("Saved to: ../projectile.csv")
+    print("Saved to: ../projectile_dataset.csv")
+    print(f"Rows: {len(dataset)}, Columns: {list(dataset.columns)}")
