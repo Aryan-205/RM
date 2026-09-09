@@ -1,12 +1,23 @@
+import sys
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
+# allow "from plots.projectile_plots import ..." when run from project root
+sys.path.append(str(Path(__file__).resolve().parent.parent))
+from plots.projectile_plots import (
+    plot_actual_vs_predicted,
+    plot_residuals,
+    plot_trajectory_comparison,
+)
+
 g = 9.81
+RESULTS_DIR = Path(__file__).resolve().parent.parent / "results"
 
 
 # -------------------- LOAD DATA --------------------
@@ -60,56 +71,24 @@ report_metrics("Random Forest", y_test, forest_predictions)
 
 # -------------------- STAGE 6: VISUAL COMPARISON --------------------
 
-# 1) Predicted vs Actual scatter (x and y), Random Forest
-fig, axes = plt.subplots(1, 2, figsize=(10, 5))
-
 y_test_arr = np.asarray(y_test)
 
-axes[0].scatter(y_test_arr[:, 0], forest_predictions[:, 0], alpha=0.4, s=10)
-axes[0].plot(
-    [y_test_arr[:, 0].min(), y_test_arr[:, 0].max()],
-    [y_test_arr[:, 0].min(), y_test_arr[:, 0].max()],
-    "r--", label="perfect prediction"
+plot_actual_vs_predicted(
+    y_test_arr, forest_predictions,
+    save_path=RESULTS_DIR / "actual_vs_predicted.png"
 )
-axes[0].set_xlabel("Actual x (m)")
-axes[0].set_ylabel("Predicted x (m)")
-axes[0].set_title("Random Forest: Actual vs Predicted x")
-axes[0].legend()
+print(f"\nSaved: {RESULTS_DIR / 'actual_vs_predicted.png'}")
 
-axes[1].scatter(y_test_arr[:, 1], forest_predictions[:, 1], alpha=0.4, s=10, color="green")
-axes[1].plot(
-    [y_test_arr[:, 1].min(), y_test_arr[:, 1].max()],
-    [y_test_arr[:, 1].min(), y_test_arr[:, 1].max()],
-    "r--", label="perfect prediction"
-)
-axes[1].set_xlabel("Actual y (m)")
-axes[1].set_ylabel("Predicted y (m)")
-axes[1].set_title("Random Forest: Actual vs Predicted y")
-axes[1].legend()
-
-plt.tight_layout()
-plt.savefig("results_actual_vs_predicted.png")
-print("\nSaved: results_actual_vs_predicted.png")
-
-
-# 2) Residual plot: error vs actual x, both models
 residuals_linear = y_test_arr[:, 0] - linear_predictions[:, 0]
 residuals_forest = y_test_arr[:, 0] - forest_predictions[:, 0]
 
-plt.figure(figsize=(8, 5))
-plt.scatter(y_test_arr[:, 0], residuals_linear, alpha=0.4, s=10, label="Linear Regression")
-plt.scatter(y_test_arr[:, 0], residuals_forest, alpha=0.4, s=10, label="Random Forest")
-plt.axhline(0, color="black", linewidth=1)
-plt.xlabel("Actual x (m)")
-plt.ylabel("Residual: actual x - predicted x (m)")
-plt.title("Residuals vs Actual x")
-plt.legend()
-plt.tight_layout()
-plt.savefig("results_residuals.png")
-print("Saved: results_residuals.png")
+plot_residuals(
+    y_test_arr[:, 0], residuals_linear, residuals_forest,
+    save_path=RESULTS_DIR / "residuals.png"
+)
+print(f"Saved: {RESULTS_DIR / 'residuals.png'}")
 
 
-# 3) Classical trajectory vs ML-predicted trajectory, one fixed launch condition
 def classical_trajectory(v0, theta, y0, t_array):
     x = v0 * np.cos(theta) * t_array
     y = y0 + v0 * np.sin(theta) * t_array - 0.5 * g * t_array**2
@@ -134,15 +113,10 @@ sweep_features = pd.DataFrame({
 forest_sweep_pred = forest_model.predict(sweep_features)
 linear_sweep_pred = linear_model.predict(sweep_features)
 
-plt.figure(figsize=(8, 5))
-plt.plot(x_classical, y_classical, "k-", linewidth=2, label="Classical physics")
-plt.plot(forest_sweep_pred[:, 0], forest_sweep_pred[:, 1], "g--", label="Random Forest")
-plt.plot(linear_sweep_pred[:, 0], linear_sweep_pred[:, 1], "b:", label="Linear Regression")
-plt.xlabel("x (m)")
-plt.ylabel("y (m)")
-plt.title(f"Trajectory comparison (v0={v0_s:.1f}, theta={theta_s:.2f} rad, y0={y0_s:.1f})")
-plt.legend()
-plt.grid(True)
-plt.tight_layout()
-plt.savefig("results_trajectory_comparison.png")
-print("Saved: results_trajectory_comparison.png")
+plot_trajectory_comparison(
+    x_classical, y_classical,
+    forest_sweep_pred, linear_sweep_pred,
+    v0_s, theta_s, y0_s,
+    save_path=RESULTS_DIR / "trajectory_comparison.png"
+)
+print(f"Saved: {RESULTS_DIR / 'trajectory_comparison.png'}")
