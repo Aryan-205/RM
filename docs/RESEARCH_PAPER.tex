@@ -1,0 +1,2132 @@
+%==============================================================================
+%  Machine Learning-Based Prediction of Physical Motion
+%  Part I -- The Projectile Motion Experiment
+%
+%  Author : Aryan Bola
+%  Course : Research Methodology (RM), 5th Semester B.Sc. Physics
+%
+%  Compile FROM THIS DIRECTORY (docs/), because the figure and source-listing
+%  paths are relative to this file:
+%
+%      cd docs
+%      pdflatex RESEARCH_PAPER.tex
+%      pdflatex RESEARCH_PAPER.tex     (run twice, to resolve the TOC and refs)
+%
+%  Requires, relative to this file:
+%      ../results/actual_vs_predicted.png
+%      ../results/residuals.png
+%      ../results/trajectory_comparison.png
+%      ../data/generation/projectileDataGeneration.py
+%      ../src/projectile_ml.py
+%      ../plots/projectile_plots.py
+%
+%  On Overleaf: upload the whole RM/ folder and set this file as the main
+%  document; the relative paths then work unchanged.
+%==============================================================================
+
+\documentclass[11pt,a4paper]{article}
+
+% ---------- packages ----------
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{caption}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{enumitem}
+\usepackage[colorlinks=true,linkcolor=blue!50!black,citecolor=blue!50!black,
+            urlcolor=blue!50!black]{hyperref}
+
+\graphicspath{{../results/}{results/}{./}}
+
+% ---------- code listing style ----------
+\definecolor{codegray}{gray}{0.95}
+\definecolor{codegreen}{rgb}{0.0,0.45,0.15}
+\definecolor{codeblue}{rgb}{0.10,0.20,0.65}
+
+\lstdefinestyle{pystyle}{
+  language=Python,
+  backgroundcolor=\color{codegray},
+  basicstyle=\ttfamily\footnotesize,
+  keywordstyle=\color{codeblue}\bfseries,
+  commentstyle=\color{codegreen}\itshape,
+  stringstyle=\color{red!60!black},
+  numbers=left,
+  numberstyle=\tiny\color{gray},
+  numbersep=8pt,
+  frame=single,
+  rulecolor=\color{gray!50},
+  breaklines=true,
+  breakatwhitespace=false,
+  showstringspaces=false,
+  tabsize=4,
+  captionpos=b,
+  xleftmargin=1.5em,
+  framexleftmargin=1.5em,
+}
+\lstdefinestyle{shellstyle}{
+  language=bash,
+  backgroundcolor=\color{codegray},
+  basicstyle=\ttfamily\footnotesize,
+  frame=single,
+  rulecolor=\color{gray!50},
+  breaklines=true,
+  showstringspaces=false,
+  xleftmargin=1em
+}
+\lstset{style=pystyle}
+
+% ---------- convenient shorthands for the physics symbols ----------
+\newcommand{\vzero}{v_{0}}
+\newcommand{\yzero}{y_{0}}
+\newcommand{\msq}{\,\mathrm{m\,s^{-2}}}
+\newcommand{\ms}{\,\mathrm{m\,s^{-1}}}
+\newcommand{\Rsq}{R^{2}}
+\newcommand{\stagedone}{\textbf{Complete}}
+\newcommand{\stageprog}{\textbf{In progress}}
+\newcommand{\stageplan}{Planned}
+
+\captionsetup[figure]{font=small,labelfont=bf}
+\captionsetup[table]{font=small,labelfont=bf}
+
+\setlength{\parskip}{0.6em}
+\setlength{\parindent}{0pt}
+
+%==============================================================================
+\begin{document}
+%==============================================================================
+
+\begin{titlepage}
+\centering
+\vspace*{2cm}
+
+{\LARGE\bfseries Machine Learning-Based Prediction of\\[0.3em]
+Physical Motion\par}
+
+\vspace{0.8cm}
+{\Large A Comparative Study of Projectile and Planetary Dynamics\par}
+
+\vspace{1.5cm}
+{\large\bfseries Part I --- The Projectile Motion Experiment\par}
+
+\vspace{2.5cm}
+
+\begin{tabular}{rl}
+\textbf{Author}          & Aryan Bola \\[0.35em]
+\textbf{Course}          & Research Methodology (RM) \\[0.35em]
+\textbf{Programme}       & 5th Semester, B.Sc.\ Physics \\[0.35em]
+\textbf{Document status} & Working research report \\
+                         & Stages 0--6 complete, Stage 7 in progress \\[0.35em]
+\textbf{Date}            & 10 September 2026 \\[0.35em]
+\textbf{Repository}      & \texttt{RM/} (git, branch \texttt{main}, HEAD \texttt{4702cf9}) \\
+\end{tabular}
+
+\vfill
+
+{\small All numerical results in this report were produced by executing the code in the
+accompanying repository on 10 September 2026. No result has been estimated, rounded from
+memory, or invented.\par}
+
+\vspace{1cm}
+\end{titlepage}
+
+%------------------------------------------------------------------------------
+\section*{Abstract}
+\addcontentsline{toc}{section}{Abstract}
+
+This report investigates whether a machine-learning (ML) model can learn to reproduce the motion
+of a physical system whose governing equations are already known. As the first half of a two-part
+comparative study, we treat \textbf{projectile motion} as a controlled test case. A synthetic
+dataset of 2{,}000 independent samples was generated directly from the classical kinematic
+equations, spanning initial speeds of $5$--$50\ms$, launch angles of $5^\circ$--$85^\circ$,
+initial heights of $0$--$20$~m and times sampled uniformly within each sample's own flight
+duration. Two regression models --- \textbf{Linear Regression} and a \textbf{Random Forest
+Regressor} (100 trees) --- were trained to map the input vector $[\vzero,\theta,\yzero,t]$ to the
+output position $[x,y]$, using an $80/20$ train/test split.
+
+On 400 held-out test samples the Random Forest achieved $\mathrm{RMSE}=3.47$~m and
+$\Rsq=0.9924$ for the horizontal coordinate, and $\mathrm{RMSE}=4.95$~m and $\Rsq=0.9487$ for the
+vertical coordinate. Linear Regression performed far worse ($\mathrm{RMSE}=20.09$~m,
+$\Rsq=0.745$ for $x$; $\mathrm{RMSE}=14.09$~m, $\Rsq=0.584$ for $y$), a result that is fully
+explained by the physics: the true mapping contains the products $\vzero\cos\theta\,t$ and
+$\vzero\sin\theta\,t$ and the quadratic term $\tfrac{1}{2}gt^{2}$, none of which a linear model
+can represent.
+
+A third diagnostic, however, is the most scientifically interesting. When the trained models are
+swept over a \textbf{single continuous trajectory} rather than evaluated on scattered points, the
+Random Forest produces a jagged, piecewise-constant curve that fails to close the parabola and
+never returns to the ground (mean point-wise deviation $4.74$~m, maximum $13.38$~m). High
+scatter-plot accuracy therefore does \emph{not} imply that the model has learned the underlying
+law. We conclude, for this stage, that the Random Forest has learned a good \emph{statistical
+interpolation} of the physics-generated data, not the physics itself --- a distinction we argue is
+the central scientific finding of Part~I, and the correct framing for the planetary-motion
+comparison in Part~II.
+
+\vspace{0.5em}
+\noindent\textbf{Keywords:} computational physics, supervised regression, surrogate models,
+projectile motion, random forest, synthetic data, model interpretability.
+
+%------------------------------------------------------------------------------
+\section*{How To Read This Document}
+\addcontentsline{toc}{section}{How To Read This Document}
+
+This report is written to serve two purposes at once.
+
+\begin{enumerate}[leftmargin=2em]
+  \item \textbf{As a research paper.} Sections \ref{sec:intro}, \ref{sec:physics},
+        \ref{sec:method}, \ref{sec:results}, \ref{sec:discussion} and \ref{sec:conclusion}
+        follow the standard RM structure (Introduction, Theory, Methodology, Results, Discussion,
+        Conclusion) and can be read as a conventional academic report.
+  \item \textbf{As a complete build guide for a reader with zero AI/ML background.}
+        Section~\ref{sec:mlzero} teaches every machine-learning concept used, from nothing.
+        Section~\ref{sec:implementation} contains every line of code we wrote, in the order we
+        wrote it, with an explanation of what each part does and what output to expect.
+        Section~\ref{sec:reproduce} is a step-by-step reproduction recipe that starts from an
+        empty folder.
+\end{enumerate}
+
+If you know no machine learning at all, read in this order: Section~\ref{sec:mlzero} $\rightarrow$
+Section~\ref{sec:physics} $\rightarrow$ Section~\ref{sec:implementation} $\rightarrow$
+Section~\ref{sec:reproduce}, then come back to the rest.
+
+Every number quoted in this document was produced by running the code in this repository on
+10~September~2026. Where a number was computed specifically for this report rather than printed by
+the main pipeline, this is stated explicitly.
+
+\clearpage
+\tableofcontents
+\clearpage
+
+%==============================================================================
+\section{Introduction}\label{sec:intro}
+%==============================================================================
+
+\subsection{Background}
+
+Classical mechanics gives us closed-form equations for a large class of motions. If we know the
+initial speed, launch angle and height of a thrown object, we can compute its position at any later
+time exactly, in a single line of arithmetic. Machine learning, by contrast, learns an
+input--output relationship from examples, without being told the rule.
+
+Over the last decade ML has become a standard tool inside computational physics, not as a
+replacement for physical law but as a \textbf{surrogate}: a fast approximate stand-in for an
+expensive calculation. Surrogate models are used in fluid dynamics, molecular simulation, climate
+modelling and orbital mechanics, where the governing equations are known but solving them
+repeatedly is computationally costly.
+
+\subsection{Motivation and the Obvious Objection}\label{sec:whyai}
+
+The first objection any physicist will raise --- and the objection this project must answer before
+anything else --- is:
+
+\begin{quote}
+\textit{``Why use AI to predict something that physics equations can already calculate exactly?''}
+\end{quote}
+
+If we only wanted the answer, ML would be absurd here. Projectile motion has an exact analytical
+solution that runs in microseconds. Using a 100-tree Random Forest to approximate it is strictly
+worse in every practical sense.
+
+The defensible answer has three parts.
+
+\paragraph{(a) Projectile motion is a control, not the object of study.}
+We are not proposing ML as a tool for projectile motion. We are using a system whose exact answer
+is known so that we can \emph{measure how well ML learns physics at all}. When the ground truth is
+exact, every unit of error is unambiguously the model's fault. This is the same logic that makes a
+physicist calibrate an instrument on a known standard before measuring an unknown.
+
+\paragraph{(b) The interesting question is comparative.}
+The research question concerns how ML performance \emph{degrades} as the physics becomes harder.
+Projectile motion is a non-chaotic, closed-form, single-step mapping. Planetary motion (Part~II) is
+a coupled differential system integrated over time, where errors compound. Comparing the two tells
+us something about ML that neither system tells us alone. To make that comparison, we need the easy
+case measured properly first.
+
+\paragraph{(c) Surrogate modelling is a genuine application domain.}
+In cases where the equations are known but evaluation is expensive --- many-body gravitational
+systems, $N$-body cosmological simulations, trajectory optimisation loops that need millions of
+evaluations --- a trained model that is accurate enough and thousands of times faster has real
+value. Establishing \emph{how} accurate such a surrogate can be, and what fails when it is
+inaccurate, is a legitimate research contribution.
+
+\subsection{Research Gap}
+
+Introductory ML-for-physics demonstrations typically report a high $\Rsq$ on a held-out test set
+and stop there. What is far less commonly examined at this level is the distinction between
+\textbf{point-wise statistical accuracy} and \textbf{trajectory-level physical fidelity} ---
+whether a model that scores well on scattered test points actually produces a physically valid
+curve when asked to trace one out. Section~\ref{sec:centralresult} shows those two things diverging
+sharply, which is the gap this study addresses at its own scale.
+
+\subsection{Research Question}\label{sec:rq}
+
+\paragraph{Main question.}
+\begin{quote}
+How effectively can machine learning approximate and predict physical motion, and how does its
+predictive performance differ between projectile motion and planetary dynamics?
+\end{quote}
+
+\begin{table}[h]
+\centering
+\small
+\caption{Sub-questions addressed in Part~I (this document).}
+\begin{tabular}{@{}clp{5.2cm}@{}}
+\toprule
+\textbf{\#} & \textbf{Sub-question} & \textbf{Status} \\
+\midrule
+1 & Can an ML model accurately predict projectile trajectories? & Answered --- Sec.~\ref{sec:results} \\
+2 & How does ML prediction compare with classical physics calculation? & Answered --- Sec.~\ref{sec:centralresult}, \ref{sec:mlvsphysics} \\
+3 & Does a good test score mean the model learned the physics? & Answered --- Sec.~\ref{sec:learnedphysics} \\
+4 & How does the amount of training data affect accuracy? & \stageprog{} --- Stage 7 \\
+5 & Does the model generalise outside its training range? & Stage 8 --- planned \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Sub-questions deferred to Part~II: applicability to planetary motion, error accumulation over time,
+and whether increased dynamical complexity increases prediction error.
+
+\subsection{Objectives}
+
+\begin{enumerate}[leftmargin=2em,itemsep=0.1em]
+  \item Implement projectile motion from first principles in Python as a physics baseline.
+  \item Generate a controlled synthetic dataset from that baseline.
+  \item Train at least two structurally different regression models on the dataset.
+  \item Evaluate them with standard regression metrics on data never seen during training.
+  \item Compare ML predictions with the classical solution both statistically and visually.
+  \item Quantify the effect of training-set size on accuracy (Stage 7).
+  \item Carry the validated methodology forward to the planetary-motion system.
+\end{enumerate}
+
+\subsection{Scope and Delimitations}
+
+\textbf{In scope:} two-dimensional projectile motion under constant gravity; synthetic, noise-free
+data; classical (non-deep) regression models; single-step position prediction.
+
+\textbf{Out of scope for Part~I:} air resistance, spin/Magnus effects, wind, three-dimensional
+motion, real experimental measurements, neural networks, and time-series/recursive prediction. Each
+of these is a deliberate delimitation, and each is revisited in
+Section~\ref{sec:limitations} (Limitations).
+
+%==============================================================================
+\section{Theoretical Background: The Physics}\label{sec:physics}
+%==============================================================================
+
+Because this is a physics research project and not merely an AI demonstration, the equations used
+to generate our data are derived rather than asserted, and their assumptions are stated explicitly.
+
+\subsection{Derivation From Newton's Second Law}
+
+Consider a point mass launched from height $\yzero$ with initial speed $\vzero$ at angle $\theta$
+above the horizontal. Once the projectile is in flight, and if we neglect air resistance, the
+\textbf{only} force acting is gravity, which acts vertically downward. Newton's second law
+$\vec{F}=m\vec{a}$ therefore gives
+\begin{align}
+  \text{Horizontal:}\quad & F_{x}=0    &&\Longrightarrow\quad a_{x}=0, \\
+  \text{Vertical:}\quad   & F_{y}=-mg  &&\Longrightarrow\quad a_{y}=-g.
+\end{align}
+
+The mass cancels in the vertical equation --- this is why a heavy and a light object fall
+identically in vacuum, and why our dataset contains no mass column.
+
+The initial velocity resolves into components by simple trigonometry:
+\begin{equation}
+  v_{x}(0)=\vzero\cos\theta, \qquad v_{y}(0)=\vzero\sin\theta .
+\end{equation}
+
+Integrating the accelerations once with respect to time,
+\begin{equation}
+  v_{x}(t)=\vzero\cos\theta \quad\text{(constant --- no horizontal force)},
+  \qquad
+  v_{y}(t)=\vzero\sin\theta-gt .
+\end{equation}
+
+Integrating a second time, with $x(0)=0$ and $y(0)=\yzero$,
+\begin{align}
+  \boxed{\;x(t) = \vzero\cos\theta\;t\;} \label{eq:x}\\[0.2em]
+  \boxed{\;y(t) = \yzero+\vzero\sin\theta\;t-\tfrac{1}{2}gt^{2}\;} \label{eq:y}
+\end{align}
+
+Equations \eqref{eq:x} and \eqref{eq:y} are the \textbf{entire ground truth} of this project.
+Everything the ML model is asked to learn is contained in them.
+
+\subsection{Time of Flight}
+
+We need to know when the projectile lands, so that we never generate data for times after impact
+(a projectile at $t>t_{\text{flight}}$ would have negative $y$, which is physically meaningless for
+our setup). Setting $y(t)=0$ in \eqref{eq:y} and solving the quadratic
+$\tfrac{1}{2}gt^{2}-\vzero\sin\theta\,t-\yzero=0$ gives
+\begin{equation}
+  t_{\text{flight}}
+  =\frac{\vzero\sin\theta+\sqrt{(\vzero\sin\theta)^{2}+2g\yzero}}{g}.
+  \label{eq:tof}
+\end{equation}
+
+The positive root is taken because the negative root corresponds to a time before launch. Note that
+when $\yzero=0$ this correctly reduces to the familiar
+$t_{\text{flight}}=2\vzero\sin\theta/g$.
+
+\subsection{Units and Physical Meaning}
+
+\begin{table}[h]
+\centering
+\small
+\caption{Symbols, units and the ranges used in this study.}
+\begin{tabular}{@{}cllc@{}}
+\toprule
+\textbf{Symbol} & \textbf{Meaning} & \textbf{Unit} & \textbf{Range used} \\
+\midrule
+$\vzero$ & initial speed                 & $\mathrm{m\,s^{-1}}$ & $5$--$50$ \\
+$\theta$ & launch angle above horizontal & rad ($5^\circ$--$85^\circ$) & $0.087$--$1.484$ \\
+$\yzero$ & launch height                 & m & $0$--$20$ \\
+$t$      & time since launch             & s & $0$--$t_{\text{flight}}$ (per sample) \\
+$g$      & gravitational acceleration    & $\mathrm{m\,s^{-2}}$ & $9.81$ (fixed) \\
+$x,y$    & position coordinates          & m & outputs \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The ranges were chosen to be physically reasonable for human-scale throwing and launching: $5\ms$
+is a gentle toss, $50\ms$ is roughly a fast-bowled cricket ball; heights up to $20$~m correspond to
+a launch from a building of a few storeys. Angles are clipped away from $0^\circ$ and $90^\circ$
+because both extremes are degenerate (at exactly $90^\circ$ the horizontal range is identically
+zero, which would give the model a large cluster of $x=0$ rows that carry no information about the
+$\vzero\cos\theta\,t$ relationship).
+
+\subsection{Assumptions and Their Limitations}\label{sec:assumptions}
+
+Every one of the following assumptions is built into equations \eqref{eq:x}--\eqref{eq:tof}, and
+therefore into every row of our dataset. A model trained on this data inherits all of them.
+
+\begin{table}[h]
+\centering
+\small
+\caption{Physical assumptions and their domains of validity.}
+\begin{tabular}{@{}p{3.4cm}p{4.6cm}p{6.2cm}@{}}
+\toprule
+\textbf{Assumption} & \textbf{Why it is made} & \textbf{When it fails} \\
+\midrule
+No air resistance & Makes the equations exactly solvable &
+  Fails badly for light objects, high speeds, or large cross-sections. A real cricket ball at
+  $50\ms$ can lose more than $30\%$ of its vacuum range \\
+Constant $g=9.81\msq$ & $g$ varies by ${<}0.1\%$ over our height range &
+  Fails for ballistic/orbital altitudes where $g\propto 1/r^{2}$ \\
+Flat Earth & Over ranges of ${\sim}200$~m, curvature is negligible &
+  Fails for long-range ballistics (${>}10$~km) \\
+Point mass & No rotation, no spin, no extended body &
+  Fails for spinning balls (Magnus effect), non-rigid bodies \\
+No wind / still air & Keeps the system deterministic &
+  Any crosswind adds an unmodelled acceleration \\
+2D motion & Motion stays in the vertical launch plane &
+  Valid given the above; breaks with spin or crosswind \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{This matters for the research conclusion.} Section~\ref{sec:integrity} argues that because
+our data is generated from these equations, our ML model can at best learn \emph{this idealised
+physics}, not \emph{real physics}. It has never seen air resistance and cannot possibly account
+for it.
+
+%==============================================================================
+\section{Machine Learning From Zero}\label{sec:mlzero}
+%==============================================================================
+
+\textit{This section assumes no prior knowledge whatsoever. A reader who already knows supervised
+regression can skip to Section~\ref{sec:method}.}
+
+\subsection{What Machine Learning Actually Is}
+
+A normal computer program is a rule you write, applied to data:
+\[
+  \text{rule} + \text{input} \;\longrightarrow\; \text{output}
+  \qquad\text{(ordinary programming)}
+\]
+Machine learning inverts this:
+\[
+  \text{input} + \text{output} \;\longrightarrow\; \text{rule}
+  \qquad\text{(machine learning)}
+\]
+
+You show the computer many examples of inputs paired with their correct outputs, and an algorithm
+searches for a rule that reproduces those pairs. The hope is that the discovered rule also works on
+inputs it has never seen.
+
+In our project:
+\begin{itemize}[leftmargin=2em,itemsep=0.1em]
+  \item \textbf{Input} $=[\text{initial speed},\ \text{launch angle},\ \text{initial height},\
+        \text{time}]$ --- four numbers.
+  \item \textbf{Output} $=[x\ \text{position},\ y\ \text{position}]$ --- two numbers.
+  \item The rule the model is searching for is, unknown to it, equations \eqref{eq:x}
+        and \eqref{eq:y}.
+\end{itemize}
+
+\subsection{Supervised Learning, Features and Targets}\label{sec:features}
+
+Because we give the model both the questions \emph{and} the correct answers during training, this
+is \textbf{supervised learning}. (Unsupervised learning, where you only give inputs and ask the
+machine to find structure, is not used in this project.)
+
+Vocabulary you will meet everywhere:
+
+\begin{itemize}[leftmargin=2em,itemsep=0.15em]
+  \item \textbf{Feature} --- one input column. We have four features:
+        \texttt{v0}, \texttt{theta}, \texttt{y0}, \texttt{t}.
+  \item \textbf{Target} (or \emph{label}) --- one output column we want predicted. We have two:
+        \texttt{x}, \texttt{y}.
+  \item \textbf{Sample} (or \emph{row}, \emph{instance}, \emph{example}) --- one complete
+        input--output pair.
+  \item \textbf{Feature matrix} $\mathbf{X}$ --- the table of all features for all samples.
+        Shape here: $2000\times4$.
+  \item \textbf{Target matrix} $\mathbf{y}$ --- the table of all targets. Shape here: $2000\times2$.
+\end{itemize}
+
+\paragraph{Why is $t$ a feature and not something else?}
+This is a genuine design decision, discussed in Section~\ref{sec:datasetdesign}. Because $t$ is an
+\emph{input to the physics equations}, it belongs on the input side. The model is being asked:
+``given these launch conditions and this instant in time, where is the object?''
+
+\subsection{Regression versus Classification}
+
+There are two basic supervised tasks:
+\begin{itemize}[leftmargin=2em,itemsep=0.1em]
+  \item \textbf{Classification} --- predict a category (``cat'' or ``dog'', ``spam'' or ``not spam'').
+  \item \textbf{Regression} --- predict a continuous number (a position in metres).
+\end{itemize}
+
+Ours is \textbf{regression}. Specifically it is \emph{multi-output regression}, because we predict
+two numbers ($x$ and $y$) from the same inputs. Scikit-learn handles this automatically for both
+models we use: it effectively fits one model per output and packages them together.
+
+\subsection{What \texttt{model.fit()} and \texttt{model.predict()} Really Do}\label{sec:fitpredict}
+
+These are the two operations at the heart of every scikit-learn model.
+
+\paragraph{\texttt{model.fit(X\_train, y\_train)} --- the learning step.}
+The model looks at the training samples and adjusts its internal parameters to reduce its error on
+them. What ``parameters'' means depends on the model:
+
+\begin{itemize}[leftmargin=2em,itemsep=0.2em]
+  \item For \textbf{Linear Regression}, the parameters are the coefficients $w_{1}\dots w_{4}$ and
+        intercept $b$ in
+        \[
+          \hat{y}=w_{1}\vzero+w_{2}\theta+w_{3}\yzero+w_{4}t+b .
+        \]
+        \texttt{fit} computes the coefficient values that minimise the sum of squared errors. There
+        is a closed-form linear-algebra solution for this --- no iteration is needed.
+  \item For a \textbf{Random Forest}, \texttt{fit} grows 100 decision trees. Each tree repeatedly
+        asks yes/no questions about the features (``is $\vzero>27.4$?'') and splits the data, until
+        each final group (\emph{leaf}) is small. The value stored in a leaf is the average target
+        value of the training samples that landed there.
+\end{itemize}
+
+\paragraph{\texttt{model.predict(X\_new)} --- the inference step.}
+The model applies its learned rule to new inputs. It does not learn anything here and does not
+change. Linear Regression plugs the numbers into its learned equation. The Random Forest drops each
+input down all 100 trees, reads the leaf value from each, and averages the 100 answers.
+
+\paragraph{The crucial consequence for our project.}
+A Random Forest can only ever output values it has seen averages of during training. It cannot
+extrapolate beyond the range of its training targets, and \emph{between} training points it
+produces a staircase of constant values, not a smooth curve. This single fact explains the most
+important result in Section~\ref{sec:centralresult}.
+
+\subsection{Why We Must Split the Data}\label{sec:split}
+
+If you evaluate a model on the same data you trained it on, you are measuring
+\textbf{memorisation}, not learning. A sufficiently flexible model can achieve near-zero error on
+training data by essentially storing the answers, while being useless on anything new. This failure
+is called \textbf{overfitting}.
+
+The standard defence is a \textbf{train/test split}: randomly set aside a fraction of the data (we
+use $20\%$), never let the model see it during \texttt{fit}, and evaluate only on that held-out
+portion. A score on held-out data is an honest estimate of performance on genuinely new inputs.
+
+\paragraph{\texttt{random\_state}.}
+The split is random, so a different run would produce a different split and slightly different
+numbers. Setting \texttt{random\_state=42} fixes the random number generator's seed so that the
+``random'' choices are identical every time the code runs. This is what makes our results
+\textbf{reproducible}: anyone running our code gets exactly the metrics reported in
+Section~\ref{sec:results}. (The value $42$ is a convention, not a magic number; any fixed integer
+works.)
+
+\subsection{The Two Models We Chose, and Why}\label{sec:modelchoice}
+
+The project roadmap explicitly warns against reaching for a neural network merely because the
+project is about AI. We deliberately chose two simple, structurally opposite models.
+
+\paragraph{Linear Regression.}
+The simplest possible regression model. It assumes the output is a weighted sum of the inputs. We
+include it as a \textbf{deliberate baseline that we expect to fail}, because the physics tells us
+in advance that the true relationship is \emph{not} linear: equation \eqref{eq:x} contains the
+product $\vzero\cdot\cos\theta\cdot t$ (three features multiplied together) and equation
+\eqref{eq:y} contains $t^{2}$. A linear model has no mechanism to represent either. Its failure is
+therefore \emph{diagnostic}: it confirms our dataset genuinely encodes non-linear physics.
+
+\paragraph{Random Forest Regressor.}
+An ensemble of 100 decision trees, each trained on a random resample of the data with randomised
+feature choices at each split, whose predictions are averaged. It captures non-linear interactions
+between features automatically, requires no feature scaling, and is robust with modest amounts of
+data. It is a reasonable first serious model for a tabular regression problem of this size.
+
+\paragraph{Why not a neural network (yet)?}
+With 2{,}000 samples and four features, a neural network would offer no clear advantage while
+adding architecture choices, learning-rate tuning and training instability --- all of which would
+obscure the physics question we are actually asking. A neural network becomes a defensible addition
+in Part~II, where smoothness of the learned function matters much more (see
+Section~\ref{sec:partii}).
+
+\subsection{The Evaluation Metrics, Explained}\label{sec:metrics}
+
+Let $y_{i}$ be the true value of a sample, $\hat{y}_{i}$ the model's prediction, and $n$ the number
+of test samples.
+
+\paragraph{MAE --- Mean Absolute Error.}
+\begin{equation}
+  \mathrm{MAE}=\frac{1}{n}\sum_{i=1}^{n}\bigl|y_{i}-\hat{y}_{i}\bigr|
+\end{equation}
+The average size of the error, ignoring sign. Same units as the target (metres).
+\emph{Intuition:} ``on average, the prediction is off by this many metres.'' Easy to explain to a
+non-specialist; treats all errors proportionally.
+
+\paragraph{MSE --- Mean Squared Error.}
+\begin{equation}
+  \mathrm{MSE}=\frac{1}{n}\sum_{i=1}^{n}\bigl(y_{i}-\hat{y}_{i}\bigr)^{2}
+\end{equation}
+The average of the \emph{squared} errors. Units are $\mathrm{m}^{2}$. Because errors are squared, a
+single large error contributes disproportionately, so MSE punishes big mistakes much harder than
+many small ones. Its awkward units make it hard to interpret directly, which is why we report its
+square root instead.
+
+\paragraph{RMSE --- Root Mean Squared Error.}
+\begin{equation}
+  \mathrm{RMSE}=\sqrt{\mathrm{MSE}}
+\end{equation}
+Back in metres, but still weighted toward large errors. \textbf{$\mathrm{RMSE}\geq\mathrm{MAE}$
+always}, and the gap between them tells you something: if $\mathrm{RMSE}\gg\mathrm{MAE}$, the error
+distribution has a few large outliers. \emph{Concrete interpretation for this project:} an RMSE of
+$0.5$~m would mean the predicted landing point is typically half a metre from the true one ---
+excellent for a projectile with a $100$~m range, poor for a dart board.
+
+\paragraph{$\Rsq$ --- Coefficient of Determination.}
+\begin{equation}
+  \Rsq = 1-\frac{\sum_{i}(y_{i}-\hat{y}_{i})^{2}}{\sum_{i}(y_{i}-\bar{y})^{2}}
+\end{equation}
+where $\bar{y}$ is the mean of the true values. This compares your model against the dumbest
+possible model --- one that always predicts the average, ignoring the inputs entirely.
+
+\begin{itemize}[leftmargin=2em,itemsep=0.1em]
+  \item $\Rsq=1.0$ $\rightarrow$ perfect prediction.
+  \item $\Rsq=0.0$ $\rightarrow$ your model is no better than always guessing the mean.
+  \item $\Rsq<0$ $\rightarrow$ your model is \emph{worse} than guessing the mean.
+\end{itemize}
+
+$\Rsq$ is dimensionless, which makes it useful for comparing across the $x$ and $y$ coordinates
+even though they have different spreads. It is \textbf{not} a substitute for RMSE: $\Rsq$ tells you
+the \emph{fraction of variance explained}, RMSE tells you \emph{how many metres you are wrong by}.
+A paper should report both, and this one does.
+
+\begin{quote}
+\textbf{Warning that matters for Section~\ref{sec:learnedphysics}:} all four metrics are computed
+on \emph{scattered independent test points}. None of them measures whether the model produces a
+physically coherent \emph{trajectory}. This is exactly the gap our Stage 6 visualisation exposed.
+\end{quote}
+
+%==============================================================================
+\section{Methodology}\label{sec:method}
+%==============================================================================
+
+\subsection{Research Design}
+
+This study is best characterised as \textbf{quantitative, computational, simulation-based
+comparative experimental research}. Each descriptor is chosen deliberately:
+
+\begin{itemize}[leftmargin=2em,itemsep=0.15em]
+  \item \textbf{Quantitative} --- all conclusions rest on numerical error metrics, not on
+        qualitative judgement.
+  \item \textbf{Computational / simulation-based} --- no physical apparatus is used. The
+        ``experiment'' is executed entirely in software, and the data is generated by a simulation
+        rather than measured. This is a recognised and legitimate research mode in physics; it is
+        how most of modern computational physics operates.
+  \item \textbf{Comparative} --- the design compares (i)~two ML models against each other,
+        (ii)~ML against the classical analytical solution, and ultimately (iii)~projectile dynamics
+        against planetary dynamics.
+  \item \textbf{Experimental} --- we manipulate independent variables under controlled conditions
+        and measure the effect on dependent variables.
+\end{itemize}
+
+\subsection{Variables}
+
+\begin{table}[h]
+\centering
+\small
+\caption{Independent, dependent and controlled variables.}
+\begin{tabular}{@{}llp{6.4cm}@{}}
+\toprule
+\textbf{Type} & \textbf{Variable} & \textbf{Role in this study} \\
+\midrule
+\textbf{Independent}
+  & Model type (Linear vs Random Forest)      & Manipulated in Stages 3--6 \\
+  & Training-set size ($100\to2000$ samples)  & Manipulated in Stage 7 (in progress) \\
+  & Physical-parameter range (train vs test)  & To be manipulated in Stage 8 \\
+\midrule
+\textbf{Dependent}
+  & MAE, RMSE, $\Rsq$ for $x$ and for $y$     & Measured on held-out test data \\
+  & Trajectory deviation from classical curve & Measured in Stage 6 \\
+\midrule
+\textbf{Controlled}
+  & $g=9.81\msq$                              & Fixed for every sample \\
+  & Dataset generation seed ($42$)            & Fixed --- same dataset every run \\
+  & Train/test split ($80/20$, seed $42$)     & Identical split for both models \\
+  & Feature ranges ($\vzero,\theta,\yzero$)   & Identical for all models compared \\
+  & Random Forest seed ($42$)                 & Fixed --- same forest every run \\
+  & Evaluation procedure and metrics          & Identical for both models \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Holding the split and both seeds fixed is what makes the Linear-versus-Forest comparison
+\textbf{fair}: the two models see exactly the same 1{,}600 training rows and are scored on exactly
+the same 400 test rows.
+
+\subsection{Dataset Design --- The Key Methodological Decision}\label{sec:datasetdesign}
+
+Our first dataset attempt (commit \texttt{a8613b7}, file \texttt{data/projectile.csv}, 100 rows)
+was generated by sweeping $t$ along \textbf{one single trajectory} with fixed $\vzero$, $\theta$
+and $\yzero$. This was discarded, and understanding why is important methodologically.
+
+If every row shares the same launch conditions, then the columns \texttt{v0}, \texttt{theta} and
+\texttt{y0} are \emph{constant}. A model trained on that data sees no variation in three of its
+four features and therefore cannot possibly learn how $x$ and $y$ depend on them. It would learn
+only $x(t)$ and $y(t)$ for one specific throw --- a curve-fit, not a physical relationship.
+
+The corrected design (commit \texttt{18a64af}, file \texttt{data/projectile\_dataset.csv},
+2{,}000 rows) makes \textbf{each row an independent random experiment}:
+
+\begin{enumerate}[leftmargin=2em,itemsep=0.1em]
+  \item Draw $\vzero\sim\mathrm{Uniform}(5,50)\ms$.
+  \item Draw $\theta\sim\mathrm{Uniform}(5^\circ,85^\circ)$, stored in radians.
+  \item Draw $\yzero\sim\mathrm{Uniform}(0,20)$~m.
+  \item Compute that sample's own $t_{\text{flight}}$ from equation \eqref{eq:tof}.
+  \item Draw $t\sim\mathrm{Uniform}(0,t_{\text{flight}})$ --- so time is sampled \emph{within the
+        valid flight window of that specific launch}.
+  \item Compute $x$ and $y$ from equations \eqref{eq:x} and \eqref{eq:y}.
+\end{enumerate}
+
+Step~5 is the subtle one. Drawing $t$ from a fixed global range would produce many physically
+invalid rows (times after the projectile has already landed, giving negative $y$). Drawing it from
+each sample's own flight window guarantees every row is physically valid, with $y\geq0$ by
+construction. The realised minimum $y$ in the dataset is $0.0008$~m, confirming this.
+
+\paragraph{Sample size justification.}
+2{,}000 samples for a 4-feature problem gives 500 samples per feature dimension, which is
+comfortable for a Random Forest on a smooth, noise-free function. It is small enough to train in
+under two seconds on a laptop, which matters because Stage 7 requires retraining many times.
+Whether 2{,}000 is more than necessary is precisely the question Stage 7 answers empirically rather
+than by assertion.
+
+\begin{table}[h]
+\centering
+\small
+\caption{Realised dataset statistics, computed from
+         \texttt{data/projectile\_dataset.csv} ($n=2000$).}
+\label{tab:stats}
+\begin{tabular}{@{}lrrrrrrr@{}}
+\toprule
+\textbf{Column} & \textbf{mean} & \textbf{std} & \textbf{min} &
+\textbf{25\%} & \textbf{50\%} & \textbf{75\%} & \textbf{max} \\
+\midrule
+\texttt{v0} (m/s)    & 27.628 & 13.070 & 5.023 & 15.983 & 27.321 & 39.255 & 49.974 \\
+\texttt{theta} (rad) &  0.776 &  0.405 & 0.088 &  0.431 &  0.778 &  1.128 &  1.483 \\
+\texttt{y0} (m)      &  9.764 &  5.689 & 0.006 &  4.829 &  9.666 & 14.624 & 19.994 \\
+\texttt{t} (s)       &  2.089 &  1.741 & 0.001 &  0.789 &  1.611 &  2.898 &  9.210 \\
+\midrule
+\textbf{\texttt{x} (m)} & 38.193 & 42.884 & 0.027 & 7.838 & 21.833 & 53.561 & 241.924 \\
+\textbf{\texttt{y} (m)} & 23.302 & 22.781 & 0.001 & 8.202 & 16.093 & 29.465 & 139.746 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Two features of Table~\ref{tab:stats} matter for interpreting the results. First, the target ranges
+are wide --- $x$ spans $0$ to $242$~m --- so an RMSE of $3.5$~m is roughly $1.4\%$ of the range, not
+a large error. Second, both targets are strongly right-skewed (mean well below the midpoint of the
+range), because most random launch configurations produce modest ranges and only a few produce very
+long ones. Section~\ref{sec:figures} shows this skew directly in the residual structure.
+
+\paragraph{Is synthetic data scientifically valid?}
+Yes, for this purpose, with an explicit caveat. It is valid because the research question is about
+\emph{the learning algorithm's ability to approximate a known mapping}, and synthetic data gives us
+that mapping exactly, with no measurement noise, no missing values and unlimited samples. It would
+\textbf{not} be valid if the question were ``can ML predict real thrown objects'' --- for that, the
+absence of air resistance would be a fatal flaw. This limitation is carried forward explicitly in
+Section~\ref{sec:integrity}.
+
+\subsection{Training Procedure}
+
+\begin{center}
+\small
+\begin{tabular}{@{}l@{}}
+\texttt{Full dataset (2,000 rows)}\\
+\texttt{\ \ \ \ \ \ \ \ |}\\
+\texttt{\ \ \ \ \ \ \ \ +-- train\_test\_split(test\_size=0.2, random\_state=42)}\\
+\texttt{\ \ \ \ \ \ \ \ |}\\
+\texttt{\ \ \ \ \ \ \ \ +---> Training set: 1,600 rows  --->  model.fit()}\\
+\texttt{\ \ \ \ \ \ \ \ |}\\
+\texttt{\ \ \ \ \ \ \ \ +---> Test set:\ \ \ \ \ \ 400 rows  --->  model.predict()  --->  metrics}\\
+\end{tabular}
+\end{center}
+
+Both models are trained on the identical 1{,}600-row training set and evaluated on the identical
+400-row test set. No hyperparameter tuning was performed at this stage: the Random Forest uses
+scikit-learn defaults apart from \texttt{n\_estimators=100} and a fixed seed. This is a deliberate
+choice --- introducing tuning before establishing a baseline would make it impossible to attribute
+performance differences to model \emph{type} rather than to tuning effort.
+
+\subsection{Software Environment}
+
+\begin{table}[h]
+\centering
+\small
+\caption{Software stack.}
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{Component} & \textbf{Role} \\
+\midrule
+Python 3.12  & Language runtime \\
+NumPy        & Array mathematics, random sampling \\
+pandas       & Tabular data handling, CSV I/O \\
+scikit-learn & \texttt{LinearRegression}, \texttt{RandomForestRegressor},
+               \texttt{train\_test\_split}, metrics \\
+Matplotlib   & All figures \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Repository Structure}
+
+\begin{lstlisting}[style=shellstyle,numbers=none]
+RM/
+|-- data/
+|   |-- generation/
+|   |   `-- projectileDataGeneration.py   # Stages 1-2: physics + dataset generation
+|   `-- projectile_dataset.csv            # 2,000-row generated dataset
+|-- src/
+|   `-- projectile_ml.py                  # Stages 3-6: training, evaluation, orchestration
+|-- plots/
+|   `-- projectile_plots.py               # Stage 6: all plotting functions
+|-- results/
+|   |-- actual_vs_predicted.png
+|   |-- residuals.png
+|   `-- trajectory_comparison.png
+|-- docs/
+|   |-- RESEARCH_PAPER.md
+|   `-- RESEARCH_PAPER.tex                # this document
+`-- README.md
+\end{lstlisting}
+
+The separation of \texttt{plots/} from \texttt{src/} was introduced in commit \texttt{4702cf9}. The
+rationale: plotting code is long, repetitive and conceptually separate from the scientific logic.
+Keeping it out of \texttt{projectile\_ml.py} reduced that file from 148 to 82 lines and made the
+actual experiment readable at a glance. This is the ``use functions rather than one giant script''
+principle applied concretely.
+
+%==============================================================================
+\section{Implementation, Stage by Stage}\label{sec:implementation}
+%==============================================================================
+
+This section walks through every stage in the order it was actually built, with the code, an
+explanation of the important lines, the expected output, and what to verify before moving on. A
+reader following along can build the entire project from this section alone.
+
+\subsection*{Stage 0 --- Understand the Research Problem}
+\addcontentsline{toc}{subsection}{Stage 0 --- Understand the Research Problem}
+
+No code. This stage produced the justification presented in Section~\ref{sec:whyai} and the
+research question in Section~\ref{sec:rq}.
+
+\textbf{Checkpoint before proceeding:} you should be able to answer, in your own words, ``why use
+AI when we already have the equation?'' If you cannot, the rest of the project is not defensible in
+a viva. The answer is in Section~\ref{sec:whyai}.
+
+\subsection*{Stage 1 --- Classical Projectile Motion (The Physics Baseline)}
+\addcontentsline{toc}{subsection}{Stage 1 --- Classical Projectile Motion}
+
+\textbf{Goal:} implement equations \eqref{eq:x}--\eqref{eq:tof} in Python and confirm they behave
+physically. This code becomes the \textbf{ground truth} for everything after it.
+
+\textbf{File:} \texttt{data/generation/projectileDataGeneration.py}
+
+\begin{lstlisting}[caption={Stage 1 --- the classical physics baseline.}]
+import numpy as np
+import matplotlib.pyplot as plt
+import pandas as pd
+
+# -------------------- CONSTANTS --------------------
+
+g = 9.81  # acceleration due to gravity (m/s^2)
+
+
+def generateProjectileData(numSamples, v0, theta, y0):
+    """
+    Generate projectile motion data for ONE trajectory.
+
+    Parameters:
+        numSamples : Number of points in the trajectory
+        v0         : Initial velocity (m/s)
+        theta      : Launch angle (radians)
+        y0         : Initial height (m)
+
+    Returns:
+        pandas DataFrame containing time, x and y
+    """
+
+    # Calculate time of flight  -- the time-of-flight equation
+    timeOfFlight = (
+        v0 * np.sin(theta)
+        + np.sqrt((v0 * np.sin(theta)) ** 2 + 2 * g * y0)
+    ) / g
+
+    # Generate evenly spaced time values from launch to landing
+    t = np.linspace(0, timeOfFlight, numSamples)
+
+    # Generate x(t)  -- the horizontal position equation
+    x = v0 * np.cos(theta) * t
+
+    # Generate y(t)  -- the vertical position equation
+    y = y0 + v0 * np.sin(theta) * t - 0.5 * g * t**2
+
+    return pd.DataFrame({"time": t, "x": x, "y": y})
+\end{lstlisting}
+
+\paragraph{Important lines explained.}
+\begin{itemize}[leftmargin=2em,itemsep=0.2em]
+  \item \texttt{np.linspace(0, timeOfFlight, numSamples)} creates \texttt{numSamples} evenly spaced
+        time values from launch to landing. Using \texttt{linspace} rather than a hand-written loop
+        means the arithmetic below operates on whole arrays at once (\emph{vectorisation}) --- this
+        is both faster and closer to how the equations are written on paper.
+  \item \texttt{np.sin} and \texttt{np.cos} expect \textbf{radians}, not degrees. Passing degrees is
+        the single most common bug in projectile code, and it fails silently --- you get a
+        plausible-looking wrong parabola. Use \texttt{np.deg2rad()} to convert.
+  \item \texttt{t**2} in the $y$-equation is what makes the trajectory a parabola. It is also, as
+        Section~\ref{sec:whylinearfails} shows, precisely what Linear Regression cannot represent.
+\end{itemize}
+
+\paragraph{Expected output and what to check.}
+Plot $x$ against $y$ and confirm (a)~the curve is a smooth downward parabola, (b)~it starts at
+$y=\yzero$ and ends at $y\approx0$, (c)~increasing $\vzero$ increases the range, and (d)~with
+$\yzero=0$ the maximum range occurs at $\theta=45^\circ$. That last check is the strongest physical
+validation available --- if $45^\circ$ is not optimal, something is wrong with your angle handling.
+
+\subsection*{Stage 2 --- Generate the ML Dataset}
+\addcontentsline{toc}{subsection}{Stage 2 --- Generate the ML Dataset}
+
+\textbf{Goal:} produce many independent samples spanning a range of launch conditions, as argued in
+Section~\ref{sec:datasetdesign}.
+
+\begin{lstlisting}[caption={Stage 2 --- generating independent random samples.}]
+def generateProjectileDataset(numSamples, seed=42):
+    """
+    Generate an ML-ready projectile dataset.
+
+    Each row = one random (v0, theta, y0, t) input combination and
+    the resulting (x, y) position. Rows are independent samples, not
+    points along a single trajectory, so the model sees how x and y
+    vary WITH v0, theta, y0 -- not just with t.
+    """
+
+    rng = np.random.default_rng(seed)
+
+    # Feature ranges -- keep them physically reasonable
+    v0    = rng.uniform(5, 50, numSamples)                            # m/s
+    theta = rng.uniform(np.deg2rad(5), np.deg2rad(85), numSamples)    # rad
+    y0    = rng.uniform(0, 20, numSamples)                            # m
+
+    # Time of flight for each sample (when y returns to 0)
+    timeOfFlight = (
+        v0 * np.sin(theta)
+        + np.sqrt((v0 * np.sin(theta)) ** 2 + 2 * g * y0)
+    ) / g
+
+    # Pick t randomly within [0, timeOfFlight] for each sample
+    # so t is a feature too, not the sweep variable.
+    t = rng.uniform(0, timeOfFlight)
+
+    x = v0 * np.cos(theta) * t
+    y = y0 + v0 * np.sin(theta) * t - 0.5 * g * t**2
+
+    return pd.DataFrame({
+        "v0": v0, "theta": theta, "y0": y0, "t": t, "x": x, "y": y
+    })
+\end{lstlisting}
+
+\paragraph{Important lines explained.}
+\begin{itemize}[leftmargin=2em,itemsep=0.2em]
+  \item \texttt{np.random.default\_rng(seed)} creates a seeded random-number generator. Because the
+        seed is fixed at 42, this function produces \textbf{byte-identical output every time it
+        runs}. Anyone who runs this code gets our exact dataset, and therefore our exact metrics.
+        This is reproducibility in practice, not just in principle.
+  \item \texttt{rng.uniform(0, timeOfFlight)} --- note that \texttt{timeOfFlight} here is an
+        \emph{array} of 2{,}000 different values, one per sample. NumPy broadcasts this, drawing
+        each sample's $t$ from its own individual $[0,t_{\text{flight},i}]$ interval. This one line
+        is what guarantees every row is physically valid. Writing
+        \texttt{rng.uniform(0, 10, numSamples)} instead would silently poison roughly half the
+        dataset with post-landing times.
+  \item The dataset stores \textbf{theta in radians}, not degrees. This is intentional: the model
+        consumes the same units the physics equations use, so there is no hidden conversion anywhere
+        in the pipeline.
+\end{itemize}
+
+\paragraph{Run it.}
+\begin{lstlisting}[style=shellstyle,numbers=none]
+cd data/generation
+python3 projectileDataGeneration.py
+\end{lstlisting}
+
+\paragraph{Expected output.}
+\begin{lstlisting}[style=shellstyle,numbers=none]
+          v0     theta         y0         t          x          y
+0  39.828022  1.263942  14.321999  3.689825  44.390433  87.635154
+1  24.749530  0.710544   7.142312  0.438125   8.219359  13.273331
+...
+Dataset generated successfully.
+Saved to: ../projectile_dataset.csv
+Rows: 2000, Columns: ['v0', 'theta', 'y0', 't', 'x', 'y']
+\end{lstlisting}
+
+\paragraph{What to check.}
+Open the CSV and confirm (a)~2{,}001 lines including the header, (b)~no $y$ value is negative,
+(c)~$\vzero$, $\theta$ and $\yzero$ genuinely vary from row to row --- if they are constant, you
+have made the Stage-2 mistake described in Section~\ref{sec:datasetdesign}.
+
+\subsection*{Stages 3 and 4 --- Train the Models on a Train/Test Split}
+\addcontentsline{toc}{subsection}{Stages 3 and 4 --- Train/Test Split and Model Training}
+
+\textbf{Goal:} load the dataset, separate features from targets, split it, and train both models.
+
+\textbf{File:} \texttt{src/projectile\_ml.py}
+
+\begin{lstlisting}[caption={Stages 3--4 --- loading, splitting and training.}]
+import sys
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+
+# allow "from plots.projectile_plots import ..." when run from project root
+sys.path.append(str(Path(__file__).resolve().parent.parent))
+from plots.projectile_plots import (
+    plot_actual_vs_predicted,
+    plot_residuals,
+    plot_trajectory_comparison,
+)
+
+g = 9.81
+RESULTS_DIR = Path(__file__).resolve().parent.parent / "results"
+
+# -------------------- LOAD DATA --------------------
+
+dataset = pd.read_csv("data/projectile_dataset.csv")
+
+features = dataset[["v0", "theta", "y0", "t"]]
+targets  = dataset[["x", "y"]]
+
+X_train, X_test, y_train, y_test = train_test_split(
+    features, targets, test_size=0.2, random_state=42
+)
+
+# -------------------- TRAIN MODELS --------------------
+
+linear_model = LinearRegression()
+linear_model.fit(X_train, y_train)
+linear_predictions = linear_model.predict(X_test)
+
+forest_model = RandomForestRegressor(n_estimators=100, random_state=42)
+forest_model.fit(X_train, y_train)
+forest_predictions = forest_model.predict(X_test)
+\end{lstlisting}
+
+\paragraph{Important lines explained.}
+\begin{itemize}[leftmargin=2em,itemsep=0.2em]
+  \item \texttt{dataset[["v0", "theta", "y0", "t"]]} --- the double brackets select multiple columns
+        and return a DataFrame (a table). Single brackets would return a Series (one column), which
+        scikit-learn would reject. This selection is where the feature/target decision from
+        Section~\ref{sec:features} becomes concrete code.
+  \item \texttt{train\_test\_split(..., test\_size=0.2, random\_state=42)} shuffles the rows and
+        splits off $20\%$ (400 rows) as the test set. It returns four objects in a fixed order:
+        train features, test features, train targets, test targets. Getting that order wrong is a
+        classic beginner bug that produces nonsense metrics.
+  \item \texttt{RandomForestRegressor(n\_estimators=100, random\_state=42)} ---
+        \texttt{n\_estimators} is the number of trees. More trees generally means slightly better
+        and more stable predictions with diminishing returns and longer training.
+        \texttt{random\_state} fixes both the bootstrap resampling and the random feature selection
+        at each split, so the same forest is grown every run.
+  \item Both models accept a 2-column target and handle multi-output regression internally, so we
+        never write separate $x$ and $y$ models.
+\end{itemize}
+
+\paragraph{What to check.}
+\texttt{X\_train.shape} should be \texttt{(1600, 4)} and \texttt{X\_test.shape} should be
+\texttt{(400, 4)}. If the second number is not 4, your feature selection is wrong.
+
+\subsection*{Stage 5 --- Evaluation Metrics}
+\addcontentsline{toc}{subsection}{Stage 5 --- Evaluation Metrics}
+
+\textbf{Goal:} measure both models on the held-out test set with MAE, RMSE and $\Rsq$, reported
+separately for $x$ and $y$.
+
+\begin{lstlisting}[caption={Stage 5 --- computing and reporting the metrics.}]
+def report_metrics(model_name, y_true, y_pred):
+    """
+    Print MAE, RMSE, R^2 for x and y separately.
+    y_true, y_pred: arrays/dataframes with columns [x, y] in that order.
+    """
+    y_true = np.asarray(y_true)
+    y_pred = np.asarray(y_pred)
+
+    print(f"\n--- {model_name} ---")
+    for i, label in enumerate(["x", "y"]):
+        mae  = mean_absolute_error(y_true[:, i], y_pred[:, i])
+        rmse = np.sqrt(mean_squared_error(y_true[:, i], y_pred[:, i]))
+        r2   = r2_score(y_true[:, i], y_pred[:, i])
+        print(f"{label}: MAE={mae:.3f} m, RMSE={rmse:.3f} m, R2={r2:.4f}")
+
+
+report_metrics("Linear Regression", y_test, linear_predictions)
+report_metrics("Random Forest",     y_test, forest_predictions)
+\end{lstlisting}
+
+\paragraph{Important lines explained.}
+\begin{itemize}[leftmargin=2em,itemsep=0.2em]
+  \item \texttt{np.asarray(...)} converts the pandas DataFrame to a plain NumPy array so that
+        \texttt{[:, i]} selects column \texttt{i} by position. Without this, pandas would try to
+        interpret \texttt{i} as a column \emph{name} and fail.
+  \item The loop over \texttt{["x", "y"]} reports each coordinate separately rather than averaging
+        them. This is a deliberate scientific choice: $x$ and $y$ are governed by different
+        equations --- $x$ is linear in $t$, $y$ is quadratic --- so a combined metric would hide
+        exactly the asymmetry we most want to see.
+        Section~\ref{sec:whylinearfails} shows that asymmetry clearly.
+  \item \texttt{np.sqrt(mean\_squared\_error(...))} computes RMSE. Scikit-learn's
+        \texttt{mean\_squared\_error} returns MSE; taking the square root manually converts it to
+        the interpretable metres-scale metric of Section~\ref{sec:metrics}.
+\end{itemize}
+
+\subsection*{Stage 6 --- Visual Comparison}
+\addcontentsline{toc}{subsection}{Stage 6 --- Visual Comparison}
+
+\textbf{Goal:} three diagnostic figures that show what the numbers cannot. All plotting functions
+live in \texttt{plots/projectile\_plots.py}; \texttt{src/projectile\_ml.py} calls them.
+
+\subsubsection*{6a. Actual vs Predicted scatter}
+
+\begin{lstlisting}[numbers=none]
+plot_actual_vs_predicted(
+    y_test_arr, forest_predictions,
+    save_path=RESULTS_DIR / "actual_vs_predicted.png"
+)
+\end{lstlisting}
+
+Plots true value on the horizontal axis against predicted value on the vertical, with a red dashed
+$45^\circ$ line marking perfect prediction. Points on the line are perfect; vertical scatter about
+the line is error. This plot answers ``how good is the model overall, and does its accuracy depend
+on the magnitude of the value?''
+
+\subsubsection*{6b. Residual plot}
+
+\begin{lstlisting}[numbers=none]
+residuals_linear = y_test_arr[:, 0] - linear_predictions[:, 0]
+residuals_forest = y_test_arr[:, 0] - forest_predictions[:, 0]
+
+plot_residuals(
+    y_test_arr[:, 0], residuals_linear, residuals_forest,
+    save_path=RESULTS_DIR / "residuals.png"
+)
+\end{lstlisting}
+
+A \textbf{residual} is $y_{i}-\hat{y}_{i}$, i.e.\ the signed error of a single prediction. Plotting
+residuals against the true value reveals \emph{structure} in the errors. Random scatter tightly
+around zero means the model has captured everything systematic and only noise remains. Any visible
+pattern --- a curve, a fan, a tilt --- means the model is making predictable mistakes, which means
+there is signal it has not learned. This is a far more informative diagnostic than a single summary
+number.
+
+\subsubsection*{6c. Trajectory comparison --- the decisive test}
+
+\begin{lstlisting}[caption={Stage 6c --- sweeping one launch condition over time.}]
+def classical_trajectory(v0, theta, y0, t_array):
+    x = v0 * np.cos(theta) * t_array
+    y = y0 + v0 * np.sin(theta) * t_array - 0.5 * g * t_array**2
+    return x, y
+
+# pick one condition from the test set to compare against
+sample = X_test.iloc[0]
+v0_s, theta_s, y0_s = sample["v0"], sample["theta"], sample["y0"]
+
+time_of_flight = (
+    v0_s * np.sin(theta_s)
+    + np.sqrt((v0_s * np.sin(theta_s)) ** 2 + 2 * g * y0_s)
+) / g
+t_sweep = np.linspace(0, time_of_flight, 50)
+
+x_classical, y_classical = classical_trajectory(v0_s, theta_s, y0_s, t_sweep)
+
+sweep_features = pd.DataFrame({
+    "v0": v0_s, "theta": theta_s, "y0": y0_s, "t": t_sweep
+})
+forest_sweep_pred = forest_model.predict(sweep_features)
+linear_sweep_pred = linear_model.predict(sweep_features)
+
+plot_trajectory_comparison(
+    x_classical, y_classical,
+    forest_sweep_pred, linear_sweep_pred,
+    v0_s, theta_s, y0_s,
+    save_path=RESULTS_DIR / "trajectory_comparison.png"
+)
+\end{lstlisting}
+
+\paragraph{Why this is the most important experiment in Stage 6.}
+The metrics in Stage 5 evaluate the models on 400 \emph{scattered, unrelated} points. This code does
+something fundamentally different: it fixes one launch condition and sweeps time continuously,
+asking each model to draw a \textbf{whole trajectory}. It then overlays the exact classical parabola
+on top.
+
+This converts an abstract question (``is the error small?'') into a physical one (``does the model
+produce a curve that could actually be the path of an object?''). Section~\ref{sec:centralresult}
+shows that the two questions have different answers.
+
+The specific condition used is \texttt{X\_test.iloc[0]}: $\vzero=31.21\ms$,
+$\theta=0.7435$~rad ($42.6^\circ$), $\yzero=12.03$~m, giving $t_{\text{flight}}=4.816$~s and a true
+range of $110.65$~m. It comes from the \emph{test} set, so neither model has ever trained on this
+exact launch condition.
+
+\paragraph{Run the whole pipeline.}
+\begin{lstlisting}[style=shellstyle,numbers=none]
+python3 src/projectile_ml.py      # must be run from the project root
+\end{lstlisting}
+
+Note the working-directory requirement: \texttt{pd.read\_csv("data/projectile\_dataset.csv")} uses a
+path relative to where you invoke Python, so running the script from inside \texttt{src/} will fail
+with a \texttt{FileNotFoundError}.
+
+%==============================================================================
+\section{Results}\label{sec:results}
+%==============================================================================
+
+All results below were produced by a single execution of \texttt{python3 src/projectile\_ml.py}
+from the project root on 10 September 2026, on the fixed 400-row held-out test set.
+
+\subsection{Quantitative Model Performance}\label{sec:quant}
+
+\begin{table}[h]
+\centering
+\caption{Test-set performance ($n=400$ held-out samples).}
+\label{tab:main}
+\begin{tabular}{@{}llrrr@{}}
+\toprule
+\textbf{Model} & \textbf{Target} & \textbf{MAE (m)} & \textbf{RMSE (m)} & $\boldsymbol{\Rsq}$ \\
+\midrule
+Linear Regression        & $x$ & 13.917 & 20.085 & 0.7448 \\
+Linear Regression        & $y$ & 10.295 & 14.089 & 0.5840 \\
+\midrule
+\textbf{Random Forest}   & $\boldsymbol{x}$ & \textbf{2.233} & \textbf{3.465} & \textbf{0.9924} \\
+\textbf{Random Forest}   & $\boldsymbol{y}$ & \textbf{3.299} & \textbf{4.949} & \textbf{0.9487} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[h]
+\centering
+\small
+\caption{Relative improvement of Random Forest over Linear Regression.}
+\begin{tabular}{@{}lrl@{}}
+\toprule
+\textbf{Target} & \textbf{RMSE reduction} &
+\textbf{Unexplained variance $(1-\Rsq)$} \\
+\midrule
+$x$ & $82.7\%$ & $0.255 \rightarrow 0.008$ (a $33\times$ reduction) \\
+$y$ & $64.9\%$ & $0.416 \rightarrow 0.051$ (an $8\times$ reduction) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Putting the errors in physical context.}
+The horizontal coordinate $x$ in this dataset spans $0.03$--$241.9$~m with a standard deviation of
+$42.9$~m. A Random Forest RMSE of $3.47$~m is therefore about \textbf{$1.4\%$ of the full range} and
+\textbf{$8\%$ of one standard deviation}. For a projectile with a typical range of ${\sim}100$~m,
+the model places the object within a few metres of its true position. That is a genuinely good
+result for a model that was told nothing about gravity, trigonometry, or Newton's laws.
+
+The Linear Regression RMSE of $20.09$~m, by contrast, is nearly half a standard deviation --- the
+model is frequently wrong by an amount comparable to the spread of the data itself.
+
+\subsection{Why Linear Regression Fails --- and What It Nevertheless Got Right}\label{sec:whylinearfails}
+
+This is not a case of an underpowered model failing mysteriously. Its failure is precisely predicted
+by equations \eqref{eq:x} and \eqref{eq:y}, and inspecting its learned coefficients confirms the
+diagnosis.
+
+\begin{table}[h]
+\centering
+\caption{Learned Linear Regression coefficients (computed for this report).}
+\label{tab:coef}
+\begin{tabular}{@{}lrrrrr@{}}
+\toprule
+\textbf{Output} & $\boldsymbol{\vzero}$ & $\boldsymbol{\theta}$ & $\boldsymbol{\yzero}$ &
+$\boldsymbol{t}$ & \textbf{intercept} \\
+\midrule
+$x$ & 1.056 & $-38.799$ & $-0.093$ & 18.268 & 1.786 \\
+$y$ & 0.972 & 27.514    & 0.824    & $-0.337$ & $-32.274$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Read these against the true physics, and four things stand out.
+
+\paragraph{(a) The model correctly discovered that $x$ does not depend on $\yzero$.}
+The true equation $x=\vzero\cos\theta\,t$ contains no $\yzero$ term at all, and the fitted
+coefficient is $-0.093$ --- essentially zero relative to the others. The model was never told this;
+it inferred it from the data. This is a small but real demonstration that regression coefficients
+carry physical information.
+
+\paragraph{(b) The model correctly recovered the coefficient of $\yzero$ in the $y$-equation.}
+The true equation $y=\yzero+\vzero\sin\theta\,t-\tfrac{1}{2}gt^{2}$ has a coefficient of
+\textbf{exactly 1} on $\yzero$. The model learned \textbf{0.824}. This is the one term in the
+physics that genuinely \emph{is} linear, and it is the one term the linear model gets nearly right.
+
+\paragraph{(c) The $t$-coefficient in the $y$-equation collapses to nearly zero ($-0.337$).}
+This is the signature of the failure. The true relationship between $y$ and $t$ is a downward
+parabola: $y$ \emph{rises} for the first half of the flight and \emph{falls} for the second half. A
+straight line fitted through a symmetric rise-and-fall has almost zero slope. The model has averaged
+the two halves of the trajectory into nothing. It has not learned ``gravity''; it has learned ``on
+average, time doesn't tell me much about height.''
+
+\paragraph{(d) The $\theta$-coefficient in the $x$-equation ($-38.8$) is a crude linear stand-in for $\cos\theta$.}
+Over the range $5^\circ$--$85^\circ$, $\cos\theta$ does decrease monotonically, so a negative linear
+coefficient captures the general trend --- but a straight line through a cosine is a poor
+approximation, and worse, the true relationship is \emph{multiplicative}
+($\vzero\cdot\cos\theta\cdot t$), not additive. A linear model can add its features but can never
+multiply them.
+
+\paragraph{Conclusion of this sub-analysis.}
+Linear Regression's poor score is \emph{informative}, not merely disappointing. It confirms that our
+dataset genuinely encodes non-linear, multiplicative physics --- which is exactly what makes it a
+meaningful test for a more capable model.
+
+\subsection{Figure Analysis}\label{sec:figures}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{actual_vs_predicted.png}
+\caption{Actual versus predicted position for the Random Forest on the 400-sample test set.
+Left: horizontal coordinate $x$. Right: vertical coordinate $y$. The red dashed line marks perfect
+prediction.}
+\label{fig:avp}
+\end{figure}
+
+\subsubsection*{Figure~\ref{fig:avp} --- Actual vs Predicted (Random Forest)}
+\textbf{File:} \texttt{results/actual\_vs\_predicted.png}
+
+\textbf{What it shows.} Both panels cluster tightly along the diagonal, confirming the high $\Rsq$
+values numerically reported in Table~\ref{tab:main}. Three further observations:
+
+\begin{enumerate}[leftmargin=2em,itemsep=0.2em]
+  \item \textbf{The $x$ panel is visibly tighter than the $y$ panel.} This matches
+        $\Rsq=0.9924$ vs $0.9487$ and has a physical cause: $x=\vzero\cos\theta\,t$ is a product of
+        three inputs, whereas $y$ additionally contains the quadratic $-\tfrac{1}{2}gt^{2}$. The
+        vertical motion is the harder of the two functions to approximate.
+  \item \textbf{Point density is heavily concentrated near the origin.} Most random launch
+        configurations produce short ranges; only a few produce very long ones. This reflects the
+        right-skew visible in Table~\ref{tab:stats}, and it has a direct methodological consequence
+        --- the model has far more training examples in the low-range regime than the high-range
+        regime.
+  \item \textbf{Scatter widens at large values.} The largest deviations from the diagonal occur at
+        the highest $x$ and $y$ values, exactly where training data is sparsest. This is the visual
+        signature of the data imbalance in point~2.
+\end{enumerate}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.85\textwidth]{residuals.png}
+\caption{Residual (actual $x$ minus predicted $x$) plotted against actual $x$, for both models on
+the same axes. The horizontal line marks zero error.}
+\label{fig:resid}
+\end{figure}
+
+\subsubsection*{Figure~\ref{fig:resid} --- Residual Plot}
+\textbf{File:} \texttt{results/residuals.png}
+
+\textbf{What it shows.} The two models produce visibly different error structures:
+
+\begin{itemize}[leftmargin=2em,itemsep=0.25em]
+  \item \textbf{Random Forest (orange):} residuals form a tight, roughly symmetric band around zero
+        across the whole range, with modest widening at large $x$. There is no strong systematic
+        curve or tilt --- the error is close to being unstructured, which is what a well-fitted model
+        looks like.
+  \item \textbf{Linear Regression (blue):} a clear, unmistakable \textbf{diagonal pattern}. At small
+        actual $x$ the residuals are systematically \emph{positive} (the model over-predicts short
+        throws); at large actual $x$ they become strongly \emph{negative}, reaching $+85$~m at the
+        extreme. This upward-tilting fan is the classic textbook signature of a model whose
+        functional form is wrong --- it is systematically compressing the range, pulling every
+        prediction toward the middle because a plane cannot bend to follow a curved surface.
+\end{itemize}
+
+The Linear residuals also spread far wider (roughly $-85$~m to $+85$~m) than the Random Forest
+residuals (roughly $-15$~m to $+15$~m), consistent with the RMSE ratio in Table~\ref{tab:main}.
+
+\paragraph{Why residual plots matter more than a single metric.}
+A summary number tells you \emph{how much} error there is. A residual plot tells you \emph{whether
+the error is structured}. Structured error means recoverable signal was left on the table.
+Table~\ref{tab:main} alone would tell us Linear Regression is worse; Figure~\ref{fig:resid} tells us
+\emph{why}, and that no amount of extra data would fix it.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.85\textwidth]{trajectory_comparison.png}
+\caption{One fixed launch condition ($\vzero=31.2\ms$, $\theta=0.74$~rad $=42.6^\circ$,
+$\yzero=12.0$~m) swept over time. Black solid: exact classical parabola. Green dashed: Random Forest
+prediction. Blue dotted: Linear Regression prediction.}
+\label{fig:traj}
+\end{figure}
+
+\subsubsection*{Figure~\ref{fig:traj} --- Trajectory Comparison}
+\textbf{File:} \texttt{results/trajectory\_comparison.png}
+
+This is the most important figure in the report.
+
+\textbf{What it shows.}
+
+The \textbf{classical curve} behaves exactly as physics requires: it starts at $y=12$~m, rises to an
+apex of ${\approx}34.7$~m near $x\approx50$~m, and descends to $y=0$ at $x\approx110.7$~m.
+
+The \textbf{Linear Regression curve} is a nearly flat, gently declining line hovering around
+$y\approx27$~m for the entire flight. It does not rise. It does not fall. It never lands. It is not
+a trajectory at all --- it is the straight-line best compromise discussed in
+Section~\ref{sec:whylinearfails}(c), rendered visually.
+
+The \textbf{Random Forest curve} is far more interesting, and its failure mode is subtle:
+
+\begin{enumerate}[leftmargin=2em,itemsep=0.2em]
+  \item It \textbf{broadly follows the parabola's shape} --- rising, peaking around the right region,
+        then descending.
+  \item But it is visibly \textbf{jagged and staircase-like}, made of short flat segments rather than
+        a smooth arc. This is the direct visual consequence of the mechanism described in
+        Section~\ref{sec:fitpredict}: a Random Forest's output is an \emph{average of leaf
+        constants}, so its prediction function is piecewise constant and cannot be smooth.
+  \item It \textbf{systematically under-predicts the apex}, topping out around $y\approx33$~m against
+        the true ${\approx}34.7$~m, and flattens across the peak region rather than curving.
+  \item Most seriously, it \textbf{fails to land}. The curve terminates at approximately
+        $(99\ \mathrm{m},\ 7\ \mathrm{m})$ instead of $(110.7\ \mathrm{m},\ 0\ \mathrm{m})$. At the
+        moment the real projectile hits the ground, the model believes it is still $7$~m in the air
+        and $12$~m short.
+\end{enumerate}
+
+\subsection{Trajectory-Level Error versus Point-Wise Error --- The Central Result}
+\label{sec:centralresult}
+
+To make the visual finding quantitative, we measured the deviation between each model's swept
+trajectory and the exact classical curve over the 50 sweep points (computed specifically for this
+report).
+
+\begin{table}[h]
+\centering
+\caption{Trajectory-level deviation from the classical solution, over 50 swept time points at a
+single launch condition.}
+\label{tab:traj}
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+\textbf{Model} & \textbf{RMSE in $x$ (m)} & \textbf{RMSE in $y$ (m)} &
+\textbf{Mean point-wise} & \textbf{Max point-wise} \\
+ & & & \textbf{distance (m)} & \textbf{distance (m)} \\
+\midrule
+Random Forest     & 4.39 & 2.91 & \textbf{4.74}  & \textbf{13.38} \\
+Linear Regression & 9.36 & 9.82 & 11.45 & 32.25 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Now compare Table~\ref{tab:traj} against Table~\ref{tab:main} for the Random Forest:
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{@{}lr@{}}
+\toprule
+\textbf{Measurement mode} & \textbf{$x$ error (RMSE)} \\
+\midrule
+Scattered independent test points (Table~\ref{tab:main}) & $3.47$~m \\
+Continuous trajectory sweep (Table~\ref{tab:traj})       & $4.39$~m \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The trajectory-level error is \textbf{$27\%$ higher} than the point-wise test error, and the maximum
+single-point deviation reaches $13.38$~m --- nearly four times the reported RMSE. The headline metric
+of $\Rsq=0.9924$ does not describe what happens when the model is asked to trace a coherent path.
+
+\begin{quote}
+\textbf{This is the central scientific finding of Part~I.} A model can score extremely well on the
+standard statistical evaluation while producing output that is \emph{physically invalid}: not
+smooth, not closing, not conserving the shape that the governing equations demand. Standard ML
+metrics are blind to this, because they evaluate points in isolation and never ask whether the
+collection of points forms a physically admissible curve.
+\end{quote}
+
+%==============================================================================
+\section{Discussion}\label{sec:discussion}
+%==============================================================================
+
+\subsection{Answering Sub-Question 1: Can ML Predict Projectile Trajectories?}
+
+\textbf{Yes, approximately, with an important qualification.} A Random Forest trained on 1{,}600
+samples predicts positions to within ${\sim}3.5$~m in $x$ and ${\sim}4.9$~m in $y$ ($\Rsq=0.99$ and
+$0.95$) for launch conditions inside its training range. For applications that need an approximate
+position --- a rough targeting estimate, a fast surrogate inside an optimisation loop --- this is
+usable.
+
+The qualification is Section~\ref{sec:centralresult}: the model is accurate \emph{statistically} but
+not \emph{physically}. It does not produce smooth trajectories and does not respect the landing
+condition. Any application that requires the \emph{shape} of the path, rather than isolated
+positions, would be poorly served by this model as it stands.
+
+\subsection{Answering Sub-Question 2: ML versus Classical Physics}\label{sec:mlvsphysics}
+
+There is no contest, and it is important to say so plainly rather than let the high $\Rsq$ imply
+otherwise.
+
+\begin{table}[h]
+\centering
+\small
+\caption{Classical physics versus the trained Random Forest, for this system.}
+\begin{tabular}{@{}lp{5.2cm}p{5.2cm}@{}}
+\toprule
+\textbf{Criterion} & \textbf{Classical equations} & \textbf{Random Forest} \\
+\midrule
+Accuracy        & Exact (to floating-point precision) & ${\sim}3$--$5$~m typical error \\
+Speed           & Microseconds, one arithmetic expression & Millisecond-scale; must traverse 100 trees \\
+Memory          & Three lines of code & ${\sim}1{,}600$ stored training patterns across 100 trees \\
+Extrapolation   & Valid wherever the assumptions hold & Fails outside the training range (Stage 8) \\
+Interpretability& Every term has physical meaning & Effectively a black box \\
+Requires data?  & No & Yes --- thousands of samples \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+For projectile motion, classical physics wins on every axis. \textbf{This must be stated explicitly
+in the final report.} The value of the ML experiment is not that it competes with the equations; it
+is that it \emph{measures how well learning-from-data can recover a known law}, which is the
+calibration needed before applying the same method where no closed-form law is available.
+
+\subsection{Answering Sub-Question 3: Did the Model ``Learn Physics''?}\label{sec:learnedphysics}
+
+\textbf{No.} This is the most important conceptual point in the entire project, and
+Figure~\ref{fig:traj} is the evidence.
+
+If the Random Forest had learned the \emph{law}
+$y=\yzero+\vzero\sin\theta\,t-\tfrac{1}{2}gt^{2}$, it would produce a perfect smooth parabola for
+any launch condition, and it would land exactly at $y=0$. It does neither. What it has actually
+learned is: \emph{``inputs that look like these produced outputs like those, so for a new input I
+will average the outputs of the nearest training examples I remember.''} That is sophisticated
+\textbf{interpolation over memorised examples}, not discovery of a law.
+
+Three specific pieces of evidence support this:
+
+\begin{enumerate}[leftmargin=2em,itemsep=0.2em]
+  \item \textbf{The staircase structure of Figure~\ref{fig:traj}} is a direct fingerprint of
+        leaf-averaging. A learned equation would be smooth; a lookup-and-average is piecewise
+        constant.
+  \item \textbf{The failure to land} shows the model has no concept of the constraint
+        $y(t_{\text{flight}})=0$. The physics enforces this identically for every launch; the model
+        has no mechanism to represent a constraint.
+  \item \textbf{The coefficient analysis in Section~\ref{sec:whylinearfails}} shows what ``learning
+        a term of the physics'' actually looks like --- the Linear model recovered the coefficient of
+        $\yzero$ as $0.824\approx1$, the true value. Nothing comparable can be extracted from the
+        Random Forest, because it has no coefficients, only stored averages.
+\end{enumerate}
+
+A useful way to state this in a viva: \textbf{the model learned the data, and the data came from the
+physics --- but the model did not learn the physics.} Fitting the outputs of a law is not the same as
+discovering the law.
+
+\subsection{On Synthetic Data --- Scientific Integrity}\label{sec:integrity}
+
+Our dataset was generated \emph{from the very equations the model is being asked to approximate}.
+Several consequences follow, and honesty requires stating all of them.
+
+\begin{itemize}[leftmargin=2em,itemsep=0.25em]
+  \item The data is \textbf{noise-free}. Real experimental measurements would contain instrument
+        error, and every reported metric would degrade. Our numbers are therefore an \emph{upper
+        bound} on achievable accuracy, not a realistic estimate.
+  \item The model \textbf{inherits every assumption in Section~\ref{sec:assumptions}}. It has never
+        seen air resistance, so it cannot model it. Applied to a real thrown ball, it would fail in
+        exactly the way the idealised equations fail --- and it has no way to signal that it is out
+        of its depth.
+  \item \textbf{A low error does not mean ML is ``better than physics.''} It means ML has
+        successfully copied physics. The ground truth \emph{is} the physics; the model can at best
+        approach it and can never exceed it.
+  \item The correct framing of ML's value is not accuracy but \textbf{cost and applicability}: ML
+        becomes interesting when simulations are expensive, when data is noisy, when the governing
+        equations are unknown or intractable, or when a fast surrogate is needed inside a loop. None
+        of those conditions holds for projectile motion --- which is precisely why projectile motion
+        is the right \emph{control}, not the right \emph{application}.
+\end{itemize}
+
+\subsection{Limitations of Part I}\label{sec:limitations}
+
+\begin{enumerate}[leftmargin=2em,itemsep=0.2em]
+  \item \textbf{Idealised physics.} No air resistance, no spin, no wind, constant $g$, flat Earth,
+        point mass. Section~\ref{sec:assumptions}.
+  \item \textbf{Synthetic, noise-free data.} Section~\ref{sec:integrity}.
+  \item \textbf{Single-step prediction only.} The model predicts position at an arbitrary requested
+        time. It does not propagate a state forward step by step, so error cannot accumulate --- the
+        very phenomenon that will dominate Part~II. The two systems are therefore not yet compared on
+        equal footing, and Part~II's design must address this explicitly.
+  \item \textbf{One train/test split.} All metrics come from a single split with
+        \texttt{random\_state=42}. Cross-validation (repeating over several splits and reporting mean
+        $\pm$ standard deviation) would give error bars on Table~\ref{tab:main}. Currently we have
+        point estimates with no uncertainty quantification --- a genuine methodological weakness that
+        should be corrected before the final report.
+  \item \textbf{No hyperparameter tuning.} \texttt{n\_estimators=100} and otherwise-default settings
+        were used without justification beyond convention.
+  \item \textbf{Interpolation only.} Every test sample lies inside the training range. Whether the
+        model generalises outside it is untested --- this is Stage 8.
+  \item \textbf{A single trajectory was used for Figure~\ref{fig:traj}.} The trajectory-level
+        analysis in Section~\ref{sec:centralresult} rests on one launch condition. It should be
+        repeated over many conditions before being stated as a general result.
+\end{enumerate}
+
+\subsection{Implications for Part II (Planetary Motion)}\label{sec:partii}
+
+The Part~I findings shape the Part~II design in three concrete ways.
+
+\begin{itemize}[leftmargin=2em,itemsep=0.25em]
+  \item \textbf{The smoothness problem will get worse.} A Random Forest's piecewise-constant output
+        already visibly damages a simple parabola. An orbit is a closed curve that must return to its
+        starting point; a staircase approximation will not close, and the error will be obvious
+        immediately. This argues for including a smooth-function model (polynomial features, or a
+        small neural network) in Part~II rather than relying on tree ensembles alone.
+  \item \textbf{Error accumulation must be measured, not assumed.} Planetary motion is naturally
+        posed as step-by-step propagation, where each prediction feeds the next and errors compound.
+        This is a structurally different and harder task than Part~I's single-step mapping, and the
+        comparison must acknowledge that rather than presenting a simple ``projectile error versus
+        planetary error'' table as though the tasks were equivalent.
+  \item \textbf{The evaluation protocol needs a physical component.}
+        Section~\ref{sec:centralresult} showed that $\Rsq$ alone is misleading. Part~II should report
+        physics-aware diagnostics alongside the statistical metrics --- for a two-body orbit, the
+        natural candidates are conservation of total energy and of angular momentum, both of which
+        the true dynamics preserve exactly and which a purely statistical model has no reason to
+        respect.
+\end{itemize}
+
+%==============================================================================
+\section{Current Status and the Stage 7 Protocol}\label{sec:stage7}
+%==============================================================================
+
+\subsection{Where the Project Stands}
+
+\begin{table}[h]
+\centering
+\small
+\caption{Stage-by-stage project status at the time of writing.}
+\begin{tabular}{@{}clll@{}}
+\toprule
+\textbf{Stage} & \textbf{Description} & \textbf{Status} & \textbf{Evidence} \\
+\midrule
+0     & Understand the research problem      & \stagedone{}  & Sec.~\ref{sec:whyai}, \ref{sec:rq} \\
+1     & Classical projectile motion          & \stagedone{}  & \texttt{projectileDataGeneration.py} \\
+2     & Generate dataset                     & \stagedone{}  & \texttt{projectile\_dataset.csv}, 2{,}000 rows \\
+3     & First ML models                      & \stagedone{}  & Linear + Random Forest \\
+4     & Train/test split                     & \stagedone{}  & $1600/400$, seed 42 \\
+5     & Evaluation metrics                   & \stagedone{}  & Table~\ref{tab:main} \\
+6     & Visual comparison                    & \stagedone{}  & Figs.~\ref{fig:avp}--\ref{fig:traj} \\
+\textbf{7} & \textbf{Experiment with training-data size} & \stageprog{} & this section \\
+8     & Test generalisation                  & \stageplan{}  & --- \\
+9--12 & Planetary motion + comparison        & \stageplan{}  & Part~II \\
+13    & Physics-informed ML (optional)       & Optional      & --- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Also outstanding across the whole project: the literature review (Section~\ref{sec:refs} is
+currently only a candidate list), cross-validation error bars (Limitation 4), and the final report
+and presentation.
+
+\subsection{Stage 7 --- Experimental Design}
+
+\textbf{Research sub-question:} How does the amount of training data affect prediction accuracy?
+
+\paragraph{Why this stage matters.}
+Stages 3--6 established \emph{that} a Random Forest works. Stage 7 is the first stage that is
+genuinely \emph{research} rather than implementation: it manipulates an independent variable
+systematically and measures the response. It converts ``we used 2{,}000 samples'' from an arbitrary
+choice into an empirically justified one.
+
+\begin{table}[h]
+\centering
+\small
+\caption{Stage 7 experimental design.}
+\begin{tabular}{@{}lp{9.5cm}@{}}
+\toprule
+\textbf{Element} & \textbf{Specification} \\
+\midrule
+Independent variable & Training-set size: $100$, $250$, $500$, $1000$, $1600$ samples \\
+Dependent variables  & Test RMSE and $\Rsq$ for $x$ and $y$ \\
+Controlled           & \textbf{The same 400-row test set for every size}, $g$, seeds, model
+                       settings, feature ranges \\
+Model                & Random Forest (100 trees, seed 42) --- and Linear Regression as the
+                       flat-line control \\
+Repetitions          & 5 random subsamples at each size; report mean $\pm$ standard deviation \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{The critical methodological point.}
+The test set must be held \emph{completely fixed} across every training size. If the test set changed
+with each run, a change in RMSE could not be attributed to training size --- it might just be an
+easier or harder test set. Fixing it makes training size the \emph{only} thing that varies, which is
+what makes this a controlled experiment rather than a collection of unrelated runs.
+
+\paragraph{The second methodological point.}
+Running each size once gives a single number with no indication of how much it would vary by chance.
+With only 100 training samples, \emph{which} 100 you happen to draw matters enormously. Repeating
+5 times with different subsamples and reporting mean $\pm$ standard deviation converts a suggestive
+sequence of numbers into a defensible result with error bars.
+
+\paragraph{Skeleton to build on.}
+
+\begin{lstlisting}[caption={Stage 7 --- learning-curve experiment skeleton.}]
+# Reserve the fixed test set ONCE, before the loop.
+X_train_full, X_test, y_train_full, y_test = train_test_split(
+    features, targets, test_size=0.2, random_state=42
+)
+
+sizes = [100, 250, 500, 1000, 1600]
+records = []
+
+for n in sizes:
+    for repeat in range(5):
+        # draw a random n-row subset of the TRAINING pool only
+        idx = X_train_full.sample(n=n, random_state=repeat).index
+        X_sub, y_sub = X_train_full.loc[idx], y_train_full.loc[idx]
+
+        model = RandomForestRegressor(n_estimators=100, random_state=42)
+        model.fit(X_sub, y_sub)
+        pred = model.predict(X_test)          # ALWAYS the same test set
+
+        # record RMSE for x and y, tagged with n and repeat
+        # ... append to records ...
+
+# Then: plot mean RMSE vs n, with std as error bars, on a log-scaled x-axis.
+\end{lstlisting}
+
+\paragraph{Expected result and how to interpret it.}
+The learning curve should fall steeply from 100 to ${\sim}500$ samples and then flatten. The
+flattening point is the answer to ``how much data do we actually need,'' and it is the number to
+quote in the final report. If the curve is still falling steeply at 1{,}600 samples, the honest
+conclusion is that 2{,}000 samples is \emph{insufficient} and the dataset should be regenerated
+larger --- a legitimate and publishable finding, not a failure.
+
+\paragraph{Watch for the confound.}
+Linear Regression's error should stay roughly flat regardless of training size. That is not a bug ---
+it is the expected behaviour of a model whose \emph{functional form}, not its data supply, is the
+limiting factor. Including it makes the point sharply: more data fixes a data problem, not a
+wrong-model problem.
+
+\subsection{Recommended Additions Beyond the Original Stage 7 Plan}
+
+Two extensions would materially strengthen the study at low cost:
+
+\begin{enumerate}[leftmargin=2em,itemsep=0.2em]
+  \item \textbf{Plot trajectory-level error against training size, alongside RMSE.}
+        Section~\ref{sec:centralresult} showed these two measures diverge. Showing whether more data
+        closes that gap --- or whether the staircase artefact persists at every training size, as the
+        mechanism in Section~\ref{sec:fitpredict} predicts it must --- would turn Part~I's central
+        observation into a properly supported claim.
+  \item \textbf{Add cross-validation error bars to Table~\ref{tab:main}.} This resolves Limitation 4
+        and costs only a few extra lines.
+\end{enumerate}
+
+%==============================================================================
+\section{Conclusions So Far}\label{sec:conclusion}
+%==============================================================================
+
+Restricted to Part~I, and to the stages completed at the time of writing:
+
+\begin{enumerate}[leftmargin=2em,itemsep=0.3em]
+  \item \textbf{A Random Forest can approximate projectile motion well within its training domain.}
+        $\mathrm{RMSE}\approx3.5$~m in $x$ ($\Rsq=0.9924$) and ${\approx}4.9$~m in $y$
+        ($\Rsq=0.9487$) on 400 unseen samples, from a model given no physical knowledge whatsoever.
+
+  \item \textbf{Model choice dominates, and the physics predicts which model will win.} Linear
+        Regression's failure ($\Rsq=0.745/0.584$) is fully explained by the multiplicative and
+        quadratic structure of the governing equations. Its learned coefficients nevertheless
+        recovered two true physical facts --- that $x$ is independent of $\yzero$, and that $y$
+        depends on $\yzero$ with coefficient $\approx1$ --- showing that even a failing model can
+        carry physical information.
+
+  \item \textbf{Good statistical scores do not imply physical validity.} The same Random Forest that
+        scores $\Rsq=0.99$ on scattered points produces a jagged trajectory that under-shoots the
+        apex and never lands, with trajectory-level error $27\%$ higher than its reported RMSE and a
+        maximum deviation of $13.4$~m. This is Part~I's central finding.
+
+  \item \textbf{The model approximated the data, not the law.} The staircase structure and the
+        violated landing condition are direct fingerprints of leaf-averaging over memorised examples.
+        Successful prediction is not discovery.
+
+  \item \textbf{Classical physics remains superior for this system on every axis} --- accuracy,
+        speed, memory, interpretability and extrapolation. ML's value here is as an instrument for
+        measuring learnability, not as a competing method.
+\end{enumerate}
+
+\textbf{Immediate next step:} complete Stage 7 as specified in Section~\ref{sec:stage7}, then Stage 8
+(generalisation), then Part~II.
+
+%==============================================================================
+\section{How To Reproduce This Project From Scratch}\label{sec:reproduce}
+%==============================================================================
+
+A reader with no ML background should be able to rebuild this entire project by following these
+steps.
+
+\paragraph{Step 1 --- Install Python and the required libraries.}
+\begin{lstlisting}[style=shellstyle,numbers=none]
+python3 -m venv venv
+source venv/bin/activate          # on Windows: venv\Scripts\activate
+pip install numpy pandas scikit-learn matplotlib
+\end{lstlisting}
+A \emph{virtual environment} keeps this project's libraries separate from the rest of your system, so
+that upgrading a package for another project cannot silently change your results.
+
+\paragraph{Step 2 --- Create the folder structure.}
+\begin{lstlisting}[style=shellstyle,numbers=none]
+mkdir -p RM/data/generation RM/src RM/plots RM/results RM/docs
+cd RM
+\end{lstlisting}
+
+\paragraph{Step 3 --- Write the physics and dataset generator.}
+Create \texttt{data/generation/projectileDataGeneration.py} with the code from
+Section~\ref{sec:implementation}, Stages 1 and 2, plus this entry point at the bottom:
+\begin{lstlisting}[numbers=none]
+if __name__ == "__main__":
+    dataset = generateProjectileDataset(numSamples=2000)
+    print(dataset.head())
+    dataset.to_csv("../projectile_dataset.csv", index=False)
+    print(f"\nRows: {len(dataset)}, Columns: {list(dataset.columns)}")
+\end{lstlisting}
+The \texttt{if \_\_name\_\_ == "\_\_main\_\_":} guard means this block runs only when the file is
+executed directly, not when it is imported by another file.
+
+\paragraph{Step 4 --- Generate the dataset.}
+\begin{lstlisting}[style=shellstyle,numbers=none]
+cd data/generation
+python3 projectileDataGeneration.py
+cd ../..
+\end{lstlisting}
+\textbf{Verify:} \texttt{data/projectile\_dataset.csv} exists with 2{,}001 lines
+(2{,}000 rows + header) and no negative $y$ values.
+
+\paragraph{Step 5 --- Write the plotting functions.}
+Create \texttt{plots/projectile\_plots.py} --- the full listing is in Appendix~\ref{app:listings}.
+
+\paragraph{Step 6 --- Write the ML pipeline.}
+Create \texttt{src/projectile\_ml.py} --- the full listing is in Appendix~\ref{app:listings}.
+
+\paragraph{Step 7 --- Run the experiment.}
+\begin{lstlisting}[style=shellstyle,numbers=none]
+python3 src/projectile_ml.py       # from the project root, not from src/
+\end{lstlisting}
+\textbf{Verify:} the metrics printed match Table~\ref{tab:main} exactly. Because every random seed is
+fixed, they should match to the last decimal place. If they do not, check that your dataset
+generation used \texttt{seed=42} and that your split used \texttt{random\_state=42}.
+
+\paragraph{Step 8 --- Inspect the figures.}
+Open the three PNGs in \texttt{results/}. Confirm the diagonal clustering in
+Figure~\ref{fig:avp}, the diagonal residual pattern in Figure~\ref{fig:resid}, and the staircase
+Random Forest curve in Figure~\ref{fig:traj}.
+
+\paragraph{Step 9 --- Proceed to Stage 7} using the design in Section~\ref{sec:stage7}.
+
+\begin{table}[h]
+\centering
+\small
+\caption{Common problems and their fixes.}
+\begin{tabular}{@{}p{4.6cm}p{4.4cm}p{5.2cm}@{}}
+\toprule
+\textbf{Symptom} & \textbf{Cause} & \textbf{Fix} \\
+\midrule
+\texttt{FileNotFoundError:}\newline\texttt{data/projectile\_dataset.csv} &
+  Ran the script from inside \texttt{src/} & Run from the project root \\
+\texttt{ModuleNotFoundError: plots} &
+  The \texttt{sys.path.append} line is missing & Copy it from Sec.~\ref{sec:implementation}, Stage 3 \\
+Metrics differ from Table~\ref{tab:main} &
+  A seed is unset or different & Set \texttt{seed=42} and \texttt{random\_state=42} everywhere \\
+Parabola looks wrong &
+  Angle passed in degrees & Use \texttt{np.deg2rad()}; NumPy trig expects radians \\
+All $y$ values negative after some point &
+  $t$ drawn from a fixed global range & Draw $t$ per-sample from $[0,t_{\text{flight},i}]$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+%==============================================================================
+\section{References --- Candidate Sources (To Be Verified)}\label{sec:refs}
+%==============================================================================
+
+\textbf{This section is not yet a completed literature review.} The following are genuine,
+well-known works that are appropriate starting points for the review stage. Every one must be
+located, read, and independently verified before being cited in the final report --- do not cite
+anything from this list on the strength of its appearance here.
+
+\paragraph{Software and methods}
+\begin{itemize}[leftmargin=2em,itemsep=0.15em]
+  \item Breiman, L. (2001). ``Random Forests.'' \emph{Machine Learning}, 45(1), 5--32. --- the
+        original Random Forest paper; cite this for the algorithm described in
+        Section~\ref{sec:fitpredict}.
+  \item Pedregosa, F.\ et al.\ (2011). ``Scikit-learn: Machine Learning in Python.''
+        \emph{Journal of Machine Learning Research}, 12, 2825--2830.
+  \item Harris, C.\ R.\ et al.\ (2020). ``Array programming with NumPy.'' \emph{Nature}, 585,
+        357--362.
+  \item Hunter, J.\ D.\ (2007). ``Matplotlib: A 2D Graphics Environment.''
+        \emph{Computing in Science \& Engineering}, 9(3), 90--95.
+\end{itemize}
+
+\paragraph{Machine learning in physics}
+\begin{itemize}[leftmargin=2em,itemsep=0.15em]
+  \item Raissi, M., Perdikaris, P., \& Karniadakis, G.\ E.\ (2019). ``Physics-informed neural
+        networks.'' \emph{Journal of Computational Physics}, 378, 686--707. --- directly relevant to
+        Stage 13 and to the Section~\ref{sec:partii} argument that physical constraints should be
+        built into the model rather than hoped for.
+  \item Karniadakis, G.\ E.\ et al.\ (2021). ``Physics-informed machine learning.''
+        \emph{Nature Reviews Physics}, 3, 422--440. --- a review; a good entry point to the field.
+  \item Greydanus, S., Dzamba, M., \& Yosinski, J.\ (2019). ``Hamiltonian Neural Networks.''
+        \emph{NeurIPS 2019.} --- models that respect conservation laws by construction; relevant to
+        the Part~II energy-conservation diagnostic.
+\end{itemize}
+
+\paragraph{Machine learning for orbital and gravitational dynamics (Part II)}
+\begin{itemize}[leftmargin=2em,itemsep=0.15em]
+  \item Breen, P.\ G.\ et al.\ (2020). ``Newton versus the machine: solving the chaotic three-body
+        problem using deep neural networks.'' \emph{Monthly Notices of the Royal Astronomical
+        Society}, 494(2), 2465--2470. --- the closest published analogue to Part~II's research
+        question.
+  \item Cranmer, M.\ et al.\ (2020). ``Discovering Symbolic Models from Deep Learning with Inductive
+        Biases.'' \emph{NeurIPS 2020.} --- relevant to Section~\ref{sec:learnedphysics}: recovering
+        an actual equation rather than a black-box fit.
+\end{itemize}
+
+\paragraph{Physics textbooks}
+\begin{itemize}[leftmargin=2em,itemsep=0.15em]
+  \item Any standard undergraduate mechanics text (Kleppner \& Kolenkow, \emph{An Introduction to
+        Mechanics}; or Taylor, \emph{Classical Mechanics}) for the derivations in
+        Section~\ref{sec:physics}.
+\end{itemize}
+
+For each source the review should record: what problem was studied, what method was used, what was
+found, how it relates to this project, and what gap remains.
+
+%==============================================================================
+\appendix
+\section{Complete File Listings}\label{app:listings}
+%==============================================================================
+
+These are the exact contents of the project files at commit \texttt{4702cf9}, reproduced verbatim so
+that the project can be rebuilt from this document alone.
+
+\subsection{\texttt{data/generation/projectileDataGeneration.py}}
+\lstinputlisting[language=Python]{../data/generation/projectileDataGeneration.py}
+
+\subsection{\texttt{src/projectile\_ml.py}}
+\lstinputlisting[language=Python]{../src/projectile_ml.py}
+
+\subsection{\texttt{plots/projectile\_plots.py}}
+\lstinputlisting[language=Python]{../plots/projectile_plots.py}
+
+%==============================================================================
+\section{Glossary}\label{app:glossary}
+%==============================================================================
+
+Every technical term used in this document, defined for a reader with no ML background.
+
+\begin{longtable}{@{}p{3.3cm}p{11.5cm}@{}}
+\toprule
+\textbf{Term} & \textbf{Definition} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Term} & \textbf{Definition} \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+Coefficient & A learned weight multiplying one feature in a linear model. See
+  Table~\ref{tab:coef}. \\
+Cross-validation & Repeating the train/test split several different ways and averaging the results,
+  to obtain error bars rather than a single point estimate. \\
+Decision tree & A model that makes predictions by asking a sequence of yes/no questions about the
+  features until it reaches a final group (leaf) holding a stored answer. \\
+Ensemble & A collection of models whose predictions are combined (here, averaged). A Random Forest
+  is an ensemble of decision trees. \\
+Extrapolation & Prediction \emph{outside} the range of the training data. Dangerous for ML models
+  --- a Random Forest literally cannot output a value beyond the range of its training targets. \\
+Feature & One input column. Ours: \texttt{v0}, \texttt{theta}, \texttt{y0}, \texttt{t}. \\
+\texttt{fit()} & The learning step: the model adjusts its internal parameters to reduce error on the
+  training data. \\
+Ground truth & The known-correct answer. Here, the output of the classical equations
+  \eqref{eq:x}--\eqref{eq:y}. \\
+Held-out data & Samples deliberately excluded from training, used only for evaluation. Our 400-row
+  test set. \\
+Hyperparameter & A setting chosen \emph{before} training, not learned from data
+  (e.g.\ \texttt{n\_estimators=100}). \\
+Interpolation & Prediction \emph{inside} the range of the training data. All of our current testing
+  is interpolation. \\
+Leaf & A terminal node of a decision tree, storing the average target value of the training samples
+  that reached it. \\
+MAE & Mean Absolute Error --- the average size of the error, in metres.
+  Section~\ref{sec:metrics}. \\
+Multi-output regression & Predicting several numbers at once from the same inputs (here, $x$ and
+  $y$). \\
+Overfitting & When a model memorises the training data instead of learning a generalisable rule ---
+  good training scores, poor test scores. \\
+\texttt{predict()} & The inference step: applying the already-learned rule to new inputs. Changes
+  nothing about the model. \\
+$\Rsq$ & Coefficient of determination --- the fraction of variance explained, relative to always
+  guessing the mean. Section~\ref{sec:metrics}. \\
+\texttt{random\_state} / seed & A fixed number that makes ``random'' operations produce identical
+  results on every run, ensuring reproducibility. \\
+Regression & Predicting a continuous number (as opposed to classification, which predicts a
+  category). \\
+Residual & $y_i-\hat{y}_i$ for one sample --- the signed error. Plotting residuals reveals
+  \emph{structure} in the errors. \\
+RMSE & Root Mean Squared Error --- like MAE but penalises large errors more heavily; same units as
+  the target. Section~\ref{sec:metrics}. \\
+Sample / row / instance & One complete input--output pair. \\
+Supervised learning & Learning from examples where both the inputs and the correct outputs are
+  provided. \\
+Surrogate model & A fast approximate stand-in for an expensive exact calculation. The main
+  legitimate use case for ML in physics. \\
+Synthetic data & Data generated by simulation rather than measured experimentally.
+  Section~\ref{sec:integrity}. \\
+Target / label & One output column we want to predict. Ours: \texttt{x}, \texttt{y}. \\
+Test set & Held-out data used only for final evaluation. \\
+Training set & The data the model learns from. Ours: 1{,}600 rows. \\
+Train/test split & Dividing the data so that evaluation happens on samples the model has never seen.
+  Section~\ref{sec:split}. \\
+Vectorisation & Performing arithmetic on whole arrays at once rather than element-by-element in a
+  loop. Faster, and closer to how equations are written. \\
+\end{longtable}
+
+%==============================================================================
+\section{Viva Preparation}\label{app:viva}
+%==============================================================================
+
+Questions likely to be asked, with the answer and where in this document the supporting evidence
+lives.
+
+\paragraph{Q1. Why use AI to predict something physics already calculates exactly?}
+Projectile motion is a \emph{control}, not the application. With an exact ground truth, every unit of
+error is unambiguously the model's fault, which lets us measure how well ML learns physics at all.
+That measurement is what makes the comparison with planetary dynamics meaningful.
+$\rightarrow$ Sec.~\ref{sec:whyai}
+
+\paragraph{Q2. What exactly is the model learning?}
+A mapping from $[\vzero,\theta,\yzero,t]$ to $[x,y]$. It is \emph{not} learning the equations. It is
+learning to interpolate among memorised training examples.
+$\rightarrow$ Sec.~\ref{sec:fitpredict}, \ref{sec:learnedphysics}
+
+\paragraph{Q3. Why can't you evaluate on the training data?}
+That measures memorisation, not learning. A flexible model can score near-perfectly on data it has
+stored while failing on anything new --- overfitting. $\rightarrow$ Sec.~\ref{sec:split}
+
+\paragraph{Q4. What does an RMSE of $3.47$~m actually mean here?}
+The horizontal position is typically wrong by about $3.5$~m --- roughly $1.4\%$ of the $242$~m range
+of $x$ in the dataset, or $8\%$ of one standard deviation.
+$\rightarrow$ Sec.~\ref{sec:metrics}, \ref{sec:quant}
+
+\paragraph{Q5. Why did Linear Regression fail?}
+Because the true relationships are multiplicative ($\vzero\cos\theta\,t$) and quadratic
+($-\tfrac{1}{2}gt^{2}$), and a linear model can only add its features, never multiply them or bend.
+Its fitted $t$-coefficient in the $y$-equation collapsed to $-0.337$, because a straight line through
+a symmetric rise-and-fall has nearly zero slope. $\rightarrow$ Sec.~\ref{sec:whylinearfails}
+
+\paragraph{Q6. Did Linear Regression get anything right?}
+Yes, two real physical facts. It learned that $x$ does not depend on $\yzero$ (coefficient
+$-0.093\approx0$, and the true equation has no $\yzero$ term), and it recovered the coefficient of
+$\yzero$ in the $y$-equation as $0.824$, against a true value of exactly 1.
+$\rightarrow$ Sec.~\ref{sec:whylinearfails}
+
+\paragraph{Q7. Does a good $\Rsq$ mean the AI discovered Newton's laws?}
+No --- and this is the project's central finding. The same model that scores $\Rsq=0.9924$ produces a
+jagged trajectory that under-shoots the apex and never lands, with trajectory-level error $27\%$
+higher than its reported RMSE. Statistical accuracy and physical validity are different things.
+$\rightarrow$ Sec.~\ref{sec:centralresult}, \ref{sec:learnedphysics}
+
+\paragraph{Q8. Why is the Random Forest trajectory jagged?}
+Because a Random Forest predicts by averaging constant values stored in tree leaves. Its output
+function is piecewise constant by construction and can never be smooth, no matter how much data it is
+given. $\rightarrow$ Sec.~\ref{sec:fitpredict}, \ref{sec:figures}
+
+\paragraph{Q9. Is your data real or synthetic?}
+Synthetic --- generated from the classical equations. This is valid for measuring learnability, but it
+means the model inherits every idealisation (no air resistance, constant $g$, flat Earth, point mass)
+and that our metrics are an upper bound on real-world accuracy.
+$\rightarrow$ Sec.~\ref{sec:assumptions}, \ref{sec:integrity}
+
+\paragraph{Q10. What would happen with measurement noise?}
+All metrics would degrade. Noise sets a floor on achievable error that no model can beat, and
+separating ``the model is wrong'' from ``the data is noisy'' becomes a genuine difficulty. Our
+noise-free setting removes that confound deliberately. $\rightarrow$ Sec.~\ref{sec:integrity}
+
+\paragraph{Q11. Why not use a neural network?}
+With 2{,}000 samples and four features it offers no clear advantage, while adding architecture,
+learning-rate and convergence choices that would obscure the physics question. It becomes defensible
+in Part~II, where smoothness of the learned function matters much more.
+$\rightarrow$ Sec.~\ref{sec:modelchoice}, \ref{sec:partii}
+
+\paragraph{Q12. What is the difference between interpolation and extrapolation, and why does it matter?}
+Interpolation is prediction inside the training range; extrapolation is outside it. Our results are
+entirely interpolation. A Random Forest cannot extrapolate at all --- its predictions are averages of
+stored training targets, so it can never output a value beyond the range it has seen. Testing this is
+Stage 8. $\rightarrow$ Sec.~\ref{sec:limitations}, \ref{sec:stage7}
+
+\paragraph{Q13. What happens if you train with too little data?}
+This is exactly what Stage 7 measures. The expected result is a learning curve that falls steeply and
+then flattens, with the flattening point identifying how much data is actually needed. Linear
+Regression should stay flat throughout, because its limitation is functional form, not data supply.
+$\rightarrow$ Sec.~\ref{sec:stage7}
+
+\paragraph{Q14. Why is planetary prediction expected to be harder?}
+Three reasons: the dynamics are governed by coupled differential equations rather than a closed-form
+solution; prediction is naturally step-by-step, so errors compound over time; and an orbit is a
+closed curve that must return to its start, which a piecewise-constant model cannot produce.
+$\rightarrow$ Sec.~\ref{sec:partii}
+
+\paragraph{Q15. What is the biggest weakness of your study so far?}
+Honestly, three: all metrics come from a single train/test split with no error bars; the
+trajectory-level result in Section~\ref{sec:centralresult} rests on one launch condition; and no
+generalisation testing has been done yet. All three are identified in
+Section~\ref{sec:limitations} with a plan to address them.
+
+\vfill
+\begin{center}
+\rule{0.5\textwidth}{0.4pt}
+\end{center}
+
+\begin{center}
+\small\itshape
+End of Part I. Part II (planetary motion, Stages 9--12) will be appended to this document as those
+stages are completed.\\[0.5em]
+All numerical results in this report were produced by executing the code in this repository on
+10 September 2026.\\
+Figures referenced are the files in \texttt{results/} at commit \texttt{4702cf9}.
+\end{center}
+
+\end{document}
