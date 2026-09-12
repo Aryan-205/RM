@@ -1,0 +1,5 @@
+region,model,mean_error,median_error
+inside labelled window,pinn,0.29234700737603087,0.23937434271958868
+inside labelled window,plain,0.46884192195289187,0.3189830218500138
+beyond labelled window,pinn,1.3431299168894943,0.7865784235049716
+beyond labelled window,plain,19.73726251480211,12.165083950799247

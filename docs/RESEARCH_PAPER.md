@@ -1,67 +1,96 @@
 # Machine Learning-Based Prediction of Physical Motion: A Comparative Study of Projectile and Planetary Dynamics
 
-### Part I — The Projectile Motion Experiment
-
 **Author:** Aryan Bola
 **Course:** Research Methodology (RM), 5th Semester, B.Sc. Physics
-**Document status:** Working research report — Stages 0–6 complete, Stage 7 in progress
-**Date:** 10 September 2026
-**Code repository:** `RM/` (git, branch `main`, HEAD `4702cf9`)
+**Document status:** Complete — all stages 0–13 finished
+**Date:** 12 September 2026
+**Code repository:** `RM/` (git, branch `main`)
 
 ---
 
 ## Abstract
 
-This report investigates whether a machine-learning (ML) model can learn to reproduce the motion of a physical
-system whose governing equations are already known. As the first half of a two-part comparative study, we treat
-**projectile motion** as a controlled test case. A synthetic dataset of 2,000 independent samples was generated
-directly from the classical kinematic equations, spanning initial speeds of 5–50 m/s, launch angles of 5°–85°,
-initial heights of 0–20 m and times sampled uniformly within each sample's own flight duration. Two regression
-models — **Linear Regression** and a **Random Forest Regressor** (100 trees) — were trained to map the input
-vector [v₀, θ, y₀, t] to the output position [x, y], using an 80/20 train/test split.
+This study asks whether machine learning can learn and predict physical motion, and how its performance
+depends on the dynamical character of the system it is applied to. Two systems are used: **projectile
+motion**, which has a closed-form solution, and **two-body orbital motion**, which does not. Both are
+simulated exactly, so that every error measured is attributable to the learning algorithm and to nothing
+else. Five model families are compared — linear regression, degree-2 polynomial ridge, random forest, a
+multilayer perceptron, and two physics-informed models — under a design in which one factor is manipulated
+at a time.
 
-On 400 held-out test samples the Random Forest achieved RMSE = 3.47 m and R² = 0.9924 for the horizontal
-coordinate, and RMSE = 4.95 m and R² = 0.9487 for the vertical coordinate. Linear Regression performed far
-worse (RMSE = 20.09 m, R² = 0.745 for x; RMSE = 14.09 m, R² = 0.584 for y), a result that is fully explained by
-the physics: the true mapping contains the products v₀cos(θ)t and v₀sin(θ)t and the quadratic term ½gt², none
-of which a linear model can represent.
+**Part I (projectile motion).** On held-out data drawn from the training distribution, a Random Forest
+reaches RMSE = 3.47 m, R² = 0.9924 for x and RMSE = 4.95 m, R² = 0.9487 for y. Linear regression fails
+(R² = 0.745 / 0.584) for a reason the physics predicts exactly: the true mapping contains the products
+v₀cos(θ)t and v₀sin(θ)t and the term ½gt², none of which a weighted sum can represent. A learning-curve
+experiment over 100–10,000 training rows, repeated five times at each size, shows whole-trajectory error
+falling from 14.85 m to 2.50 m and still decreasing at the largest size tested.
 
-A third diagnostic, however, is the most scientifically interesting. When the trained models are swept over a
-**single continuous trajectory** rather than evaluated on scattered points, the Random Forest produces a jagged,
-piecewise-constant curve that fails to close the parabola and never returns to the ground (mean point-wise
-deviation 4.74 m, maximum 13.38 m). High scatter-plot accuracy therefore does **not** imply that the model has
-learned the underlying law. We conclude, for this stage, that the Random Forest has learned a good *statistical
-interpolation* of the physics-generated data, not the physics itself — a distinction we argue is the central
-scientific finding of Part I, and the correct framing for the planetary-motion comparison in Part II.
+**The central negative result.** Those scores measure *interpolation*. When the same trained models are
+evaluated outside their training envelope, accuracy collapses: the MLP, the best model in-distribution at
+0.11 m, degrades by a factor of **286** to 32.7 m. A one-dimensional slice through input space along which
+the true response is exactly linear shows the mechanism directly — a Random Forest's prediction becomes
+**exactly constant** beyond its last training split, because a forest can only ever output an average of
+training targets.
 
-**Keywords:** computational physics, supervised regression, surrogate models, projectile motion, random forest,
-synthetic data, model interpretability.
+**Part II (orbital motion).** Four integrators are implemented and validated against the analytic Kepler
+solution, recovering convergence orders 0.97, 0.99, 1.99 and 3.92 against theoretical 1, 1, 2 and 4, and
+reproducing Kepler's third law with a fitted log–log slope of 1.500000. Against this reference, accurate to
+≈ 3 × 10⁻¹¹ AU, three ML formulations are compared. A learned one-step flow map achieves a one-step position
+error of 6.4 × 10⁻⁵ AU — yet under autoregressive rollout it exceeds 0.01 AU within 0.37 years, about a third
+of an orbit. Perturbing the exact dynamics shows that separation grows only **linearly**: the two-body
+problem is integrable, so the divergence is compounding model error, not chaos.
+
+**Comparison.** With the problem formulation, model family and data volume all held fixed, and errors
+normalised by each system's own characteristic length, the difference between the two systems is shown to be
+structural rather than statistical. The exact projectile flow map is **affine**, and ordinary linear
+regression recovers it to ~10⁻¹⁴ m; the orbital flow map contains 1/r³ and lies inside no tested model's
+hypothesis space.
+
+**Physics-informed models.** A physics-informed neural network, implemented from scratch in NumPy with every
+gradient verified against finite differences, reaches 1.39 m trained on **zero labelled points** — a level a
+plain network of identical architecture needs roughly 200 labelled points to match — and is 14.7× more
+accurate than that plain network in the region of the flight where neither has data. A hard-constraint model
+that fits in a physics basis is exact to floating-point round-off everywhere, including far outside the
+training range, and recovers −g/2 = −4.905000.
+
+**Conclusion.** Machine learning is not equally effective for the two systems, and the study locates the
+difference precisely. Throughout, classical physics remains superior by roughly ten orders of magnitude; no
+model discovered a physical law, and the two that reproduce the physics exactly are the two that were handed
+it.
+
+**Keywords:** computational physics, supervised regression, surrogate models, learned simulators, error
+accumulation, symplectic integration, physics-informed neural networks, extrapolation, synthetic data.
 
 ---
 
 ## How To Read This Document
 
-This report is written to serve two purposes at once.
+This report serves two purposes at once.
 
-1. **As a research paper.** Sections 1, 2, 4, 6, 7 and 9 follow the standard RM structure (Introduction,
-   Theory, Methodology, Results, Discussion, Conclusion) and can be read as a conventional academic report.
+1. **As a research paper.** Sections 1, 2, 4, 6–13 follow the standard RM structure (Introduction, Theory,
+   Methodology, Results, Discussion, Conclusion) and read as a conventional academic report.
 
-2. **As a complete build guide for a reader with zero AI/ML background.** Section 3 teaches every machine-learning
-   concept used, from nothing. Section 5 contains every line of code we wrote, in the order we wrote it, with
-   an explanation of what each part does and what output to expect. Section 10 is a step-by-step reproduction
-   recipe that starts from an empty folder.
+2. **As a complete build guide for a reader with no AI/ML background.** Section 3 teaches every
+   machine-learning concept used, from nothing. Section 5 contains the code in the order it was written.
+   Section 14 is a reproduction recipe that starts from an empty folder.
 
-If you know no machine learning at all, read in this order: **Section 3 → Section 2 → Section 5 → Section 10**,
-then come back to the rest.
+If you know no machine learning at all, read in this order: **Section 3 → Section 2 → Section 5 →
+Section 14**, then return to the rest.
 
-Every number quoted in this document was produced by running the code in this repository on 10 September 2026.
-No result has been estimated, rounded from memory, or invented. Where a number was computed specifically for
-this report rather than printed by the main pipeline, this is stated explicitly.
+**Companion documents.** The formal methodology chapter is `docs/METHODOLOGY.md`; the literature review, with
+24 verified sources, is `docs/LITERATURE_REVIEW.md`; the talk plan is `docs/PRESENTATION_OUTLINE.md`; viva
+questions and answers are in `docs/VIVA_PREP.md`.
+
+**Provenance of every number.** Every figure quoted here was produced by running the code in this repository,
+and is stored in a CSV under `results/` alongside the figure generated from it. No result has been estimated,
+rounded from memory, or invented, and no figure was drawn or adjusted by hand. `python run_all.py` regenerates
+all of it in about 49 minutes.
 
 ---
 
 ## Table of Contents
 
+**Part I — Projectile motion**
 1. Introduction
 2. Theoretical Background: The Physics
 3. Machine Learning From Zero (for readers with no ML background)
@@ -69,13 +98,26 @@ this report rather than printed by the main pipeline, this is stated explicitly.
 5. Implementation, Stage by Stage
 6. Results
 7. Discussion
-8. Current Status and the Stage 7 Protocol
-9. Conclusions So Far
-10. How To Reproduce This Project From Scratch
-11. References
+
+**Part I (continued) — The experiments that matter**
+8. Stage 7 — How Much Data Do We Actually Need?
+9. Stage 8 — Interpolation, Extrapolation, and What R² = 0.99 Was Really Measuring
+
+**Part II — Planetary motion**
+10. Stages 9–10 — The Physics and the Numerical Baseline
+11. Stage 11 — Machine Learning for Orbital Motion
+12. Stage 12 — The Controlled Comparison
+
+**Part III — Synthesis**
+13. Stage 13 — Physics-Informed Machine Learning
+14. General Discussion, Limitations and Conclusions
+15. How To Reproduce This Project From Scratch
+16. References
+
 - Appendix A — Complete File Listings
 - Appendix B — Glossary
 - Appendix C — Viva Preparation
+- Appendix D — Index of Every Figure and Table
 
 ---
 
@@ -1209,135 +1251,660 @@ The Part I findings shape the Part II design in three concrete ways.
   preserve exactly and which a purely statistical model has no reason to respect.
 
 ---
+# 8. Stage 7 — How Much Data Do We Actually Need?
 
-# 8. Current Status and the Stage 7 Protocol
+**Sub-question 2: How does the amount of training data affect prediction accuracy?**
 
-## 8.1 Where the Project Stands
+This is the first stage that is research rather than implementation. Stages 3–6 established *that* a Random
+Forest works; Stage 7 manipulates an independent variable systematically and measures the response. It converts
+"we used 2,000 samples" from an arbitrary choice into an empirically justified one — or, as it turns out,
+into a demonstrably insufficient one.
 
-| Stage | Description | Status | Evidence |
-|---|---|---|---|
-| 0 | Understand the research problem | ✅ Complete | Sections 1.2, 1.4 |
-| 1 | Classical projectile motion | ✅ Complete | `projectileDataGeneration.py` |
-| 2 | Generate dataset | ✅ Complete | `projectile_dataset.csv`, 2,000 rows |
-| 3 | First ML models | ✅ Complete | Linear + Random Forest |
-| 4 | Train/test split | ✅ Complete | 1,600 / 400, seed 42 |
-| 5 | Evaluation metrics | ✅ Complete | Table 1 |
-| 6 | Visual comparison | ✅ Complete | Figures 1–3 |
-| **7** | **Experiment with training-data size** | **▶ In progress** | this section |
-| 8 | Test generalisation | ⬜ Planned | |
-| 9–12 | Planetary motion + comparison | ⬜ Planned | Part II |
-| 13 | Physics-informed ML (optional) | ⬜ Optional | |
-
-Also outstanding across the whole project: the literature review (Section 11 is currently only a candidate list),
-cross-validation error bars (Limitation 4), and the final report and presentation.
-
-## 8.2 Stage 7 — Experimental Design
-
-**Research sub-question:** How does the amount of training data affect prediction accuracy?
-
-**Why this stage matters.** Stages 3–6 established *that* a Random Forest works. Stage 7 is the first stage that
-is genuinely *research* rather than implementation: it manipulates an independent variable systematically and
-measures the response. It converts "we used 2,000 samples" from an arbitrary choice into an empirically justified
-one.
-
-**Design:**
+## 8.1 Design
 
 | Element | Specification |
 |---|---|
-| Independent variable | Training-set size: 100, 250, 500, 1,000, 1,600 samples |
-| Dependent variables | Test RMSE and R² for x and y |
-| Controlled | **The same 400-row test set for every size**, g, seeds, model settings, feature ranges |
-| Model | Random Forest (100 trees, `random_state=42`) — and Linear Regression as the flat-line control |
-| Repetitions | 5 random subsamples at each size; report mean ± standard deviation |
+| Independent variable | Training-set size: 100, 500, 1,000, 5,000, 10,000 rows |
+| Dependent variables | Test RMSE for x and y; whole-trajectory radial error |
+| Controlled | **One fixed 4,000-row test set, split off once before the loop**; g; model settings; feature ranges |
+| Repeats | 5 independent random draws at each size, reported as mean ± SD |
+| Models | Random Forest (100 trees) and Linear Regression as the flat-line control |
 
-**The critical methodological point.** The test set must be held *completely fixed* across every training size.
-If the test set changed with each run, a change in RMSE could not be attributed to training size — it might just
-be an easier or harder test set. Fixing it makes training size the *only* thing that varies, which is what makes
-this a controlled experiment rather than a collection of unrelated runs.
+Stages 3–6 used a 2,000-row dataset, which cannot supply a 10,000-row training set *and* an untouched test
+set. Stage 7 therefore generates its own 20,000-row dataset from the same simulator with a different seed.
 
-**The second methodological point.** Running each size once gives a single number with no indication of how much
-it would vary by chance. With only 100 training samples, *which* 100 you happen to draw matters enormously.
-Repeating 5 times with different subsamples and reporting mean ± standard deviation converts a suggestive
-sequence of numbers into a defensible result with error bars.
+**Why the test set is split off once, before anything else.** If each training size were evaluated on its own
+freshly drawn test set, a change in RMSE could be caused by the test set rather than by the training size, and
+the experiment would answer no question at all. This is the controlled-comparison principle in its simplest
+form, and it recurs in every stage that follows.
 
-**Skeleton to build on:**
+**Why five repeats.** A single 100-row training set is one lucky or unlucky sample. Without repeats there is no
+way to tell a real effect from a draw.
 
-```python
-# Reserve the fixed test set ONCE, before the loop.
-X_train_full, X_test, y_train_full, y_test = train_test_split(
-    features, targets, test_size=0.2, random_state=42
-)
+## 8.2 Results
 
-sizes = [100, 250, 500, 1000, 1600]
-records = []
+**Table 8.1 — Test RMSE (m), mean ± SD over five random training draws, on one fixed 4,000-row test set**
 
-for n in sizes:
-    for repeat in range(5):
-        # draw a random n-row subset of the TRAINING pool only
-        idx = X_train_full.sample(n=n, random_state=repeat).index
-        X_sub, y_sub = X_train_full.loc[idx], y_train_full.loc[idx]
+| n_train | Forest RMSE x | Forest RMSE y | Linear RMSE x | Linear RMSE y |
+|---|---|---|---|---|
+| 100 | 16.37 ± 2.34 | 13.27 ± 1.11 | 21.14 ± 0.24 | 15.35 ± 1.01 |
+| 500 | 8.95 ± 1.23 | 7.82 ± 0.39 | 20.87 ± 0.16 | 14.55 ± 0.09 |
+| 1,000 | 5.33 ± 0.38 | 6.28 ± 0.27 | 20.76 ± 0.07 | 14.52 ± 0.06 |
+| 5,000 | 2.85 ± 0.09 | 4.09 ± 0.11 | 20.69 ± 0.01 | 14.45 ± 0.01 |
+| 10,000 | **2.05 ± 0.02** | **3.38 ± 0.04** | 20.69 ± 0.01 | 14.44 ± 0.00 |
 
-        model = RandomForestRegressor(n_estimators=100, random_state=42)
-        model.fit(X_sub, y_sub)
-        pred = model.predict(X_test)          # ALWAYS the same test set
+**Table 8.2 — Whole-trajectory reconstruction error, averaged over 40 unseen launch conditions**
 
-        # record RMSE for x and y, tagged with n and repeat
-        # ... append to records ...
+| n_train | Mean radial error (m) | Interquartile range (m) |
+|---|---|---|
+| 100 | 14.85 | 6.73 – 20.31 |
+| 500 | 6.28 | 3.59 – 8.53 |
+| 1,000 | 5.10 | 3.07 – 6.70 |
+| 5,000 | 3.00 | 1.71 – 4.23 |
+| 10,000 | **2.50** | 1.46 – 3.45 |
 
-# Then: plot mean RMSE vs n, with std as error bars, on a log-scaled x-axis.
-```
+**Figures:** `stage7_learning_curve.png`, `stage7_stability.png`, `stage7_trajectory_by_datasize.png`.
 
-**Expected result and how to interpret it.** The learning curve should fall steeply from 100 to ~500 samples and
-then flatten. The flattening point is the answer to "how much data do we actually need," and it is the number to
-quote in the final report. If the curve is still falling steeply at 1,600 samples, the honest conclusion is that
-2,000 samples is *insufficient* and the dataset should be regenerated larger — a legitimate and publishable
-finding, not a failure.
+## 8.3 Interpretation
 
-**Watch for the confound.** Linear Regression's error should stay roughly flat regardless of training size. That
-is not a bug — it is the expected behaviour of a model whose *functional form*, not its data supply, is the
-limiting factor. Including it makes the point sharply: more data fixes a data problem, not a wrong-model problem.
+**The Random Forest's curve is still falling at 10,000 rows.** RMSE x improves from 16.37 m to 2.05 m — a
+factor of eight — and has not flattened. The honest conclusion is that **2,000 samples was insufficient**, and
+that a five-fold increase would still buy accuracy. This is a legitimate finding rather than a failure: the
+experiment was run to answer this question, and it answered it.
 
-## 8.3 Recommended Additions Beyond the Original Stage 7 Plan
+**Linear Regression's curve is flat, and that is the most instructive part of the figure.** Its RMSE moves from
+21.14 m to 20.69 m — a 2% improvement across a hundredfold increase in data. Infinite data would not help,
+because its limitation is not a shortage of examples but its functional form: it cannot represent
+v₀cos(θ)t at any sample size. **More data fixes a data problem, not a wrong-model problem**, and having both
+curves on one axis makes that distinction visible rather than asserted.
 
-Two extensions would materially strengthen the study at low cost:
+**The spread shrinks by two orders of magnitude.** The Random Forest's SD falls from ±2.34 m at n = 100 to
+±0.02 m at n = 10,000. This answers a different question from the learning curve — not "how accurate?" but "how
+much does the answer depend on *which* rows we happened to get?" At n = 100 a single run is not reproducible
+and should not be quoted; by n = 10,000 the result is stable to the second decimal place.
 
-1. **Plot trajectory-level error against training size, alongside RMSE.** Section 6.4 showed these two measures
-   diverge. Showing whether more data closes that gap — or whether the staircase artefact persists at every
-   training size, as the mechanism in Section 3.4 predicts it must — would turn Part I's central observation into
-   a properly supported claim.
-2. **Add cross-validation error bars to Table 1.** This resolves Limitation 4 and costs only a few extra lines.
-
----
-
-# 9. Conclusions So Far
-
-Restricted to Part I, and to the stages completed at the time of writing:
-
-1. **A Random Forest can approximate projectile motion well within its training domain.** RMSE ≈ 3.5 m in x
-   (R² = 0.9924) and ≈ 4.9 m in y (R² = 0.9487) on 400 unseen samples, from a model given no physical knowledge
-   whatsoever.
-
-2. **Model choice dominates, and the physics predicts which model will win.** Linear Regression's failure
-   (R² = 0.745 / 0.584) is fully explained by the multiplicative and quadratic structure of the governing
-   equations. Its learned coefficients nevertheless recovered two true physical facts — that x is independent of
-   y₀, and that y depends on y₀ with coefficient ≈ 1 — showing that even a failing model can carry physical
-   information.
-
-3. **Good statistical scores do not imply physical validity.** The same Random Forest that scores R² = 0.99 on
-   scattered points produces a jagged trajectory that under-shoots the apex and never lands, with trajectory-level
-   error 27% higher than its reported RMSE and a maximum deviation of 13.4 m. This is Part I's central finding.
-
-4. **The model approximated the data, not the law.** The staircase structure and the violated landing condition
-   are direct fingerprints of leaf-averaging over memorised examples. Successful prediction is not discovery.
-
-5. **Classical physics remains superior for this system on every axis** — accuracy, speed, memory,
-   interpretability and extrapolation. ML's value here is as an instrument for measuring learnability, not as a
-   competing method.
-
-**Immediate next step:** complete Stage 7 as specified in Section 8.2, then Stage 8 (generalisation), then Part II.
+**Trajectory-level error tracks RMSE but stays above it.** At n = 10,000 the RMSE is ~2.0 m while the mean
+whole-trajectory error is 2.50 m. The gap is the staircase artefact of Section 6.4 — a forest predicts in
+piecewise-constant steps, so a swept trajectory is jagged even when scattered points are accurate. Crucially,
+**the gap narrows but does not close**, exactly as the leaf-averaging mechanism predicts: more data means more,
+finer steps, never a smooth curve.
 
 ---
 
+# 9. Stage 8 — Interpolation, Extrapolation, and What R² = 0.99 Was Really Measuring
+
+**Sub-question 3: How far can the model be trusted outside the conditions it was trained on?**
+
+This is the most important experiment in Part I, and it reframes everything before it.
+
+## 9.1 The problem with every number reported so far
+
+Section 6 reported R² = 0.9924. Read carelessly, that is "the model learned projectile motion". It did not.
+R² was computed on test rows drawn from **the same distribution** as the training rows — same speed range, same
+angle range, same height range. That measures **interpolation**: filling gaps between things the model has seen.
+
+A physical law is not a statement about a region. It is a statement about everywhere. If the model had genuinely
+induced x = v₀cos(θ)t, it would work at v₀ = 60 m/s having only ever seen v₀ ≤ 40 m/s. Stage 8 tests exactly
+that.
+
+**Definitions used throughout.**
+- **Interpolation** — the query lies inside the convex hull of the training inputs. The model is filling a gap.
+- **Extrapolation** — the query lies outside it. The model is being asked to invent behaviour, and its answer is
+  decided entirely by its built-in assumptions — its **inductive bias** — not by data.
+
+## 9.2 Design
+
+| Element | Specification |
+|---|---|
+| Training envelope | v₀ ∈ [15, 40] m/s, θ ∈ [20°, 70°], y₀ ∈ [0, 15] m — a strict subset of what is physical |
+| Training set | **One fixed set of 8,000 rows**, used by all five models in all seven regimes |
+| Independent variable | Which region the **test** data comes from |
+| Test regimes | 1 interpolation control + 6 extrapolation regimes, 2,000 rows each |
+| Models | Linear, polynomial ridge (deg 2), random forest, MLP, physics-features |
+
+A fifth model is added here: **physics-informed features** — ordinary linear regression applied to the basis
+[v₀cos(θ)t, v₀sin(θ)t, y₀, t²], in which the true solution is exactly linear. It is not a general model. It is
+the ceiling: what a model that has been *given* the physics can do.
+
+## 9.3 Results
+
+**Table 9.1 — Mean radial error (m) by test regime. Every model saw the same training set.**
+
+| Test regime | Linear | Poly (2) | Forest | MLP | Physics features |
+|---|---|---|---|---|---|
+| **interpolation** (control) | 11.18 | 1.97 | 2.14 | **0.11** | 5.4 × 10⁻¹⁴ |
+| extrapolate v₀ high (40–55 m/s) | 36.26 | 8.15 | 31.25 | 18.53 | 5.9 × 10⁻¹⁴ |
+| extrapolate v₀ low (5–15 m/s) | 14.84 | 3.81 | 6.20 | 1.32 | 6.6 × 10⁻¹⁴ |
+| extrapolate θ high (70°–85°) | 28.27 | 8.38 | 15.28 | 2.87 | 6.5 × 10⁻¹⁴ |
+| extrapolate θ low (5°–20°) | 16.52 | 6.15 | 5.17 | 1.61 | 5.7 × 10⁻¹⁴ |
+| extrapolate y₀ high (15–30 m) | 13.37 | 2.28 | 10.24 | 0.80 | 7.9 × 10⁻¹⁴ |
+| **all variables outside at once** | 66.24 | 34.04 | 55.59 | 32.70 | 1.2 × 10⁻¹³ |
+| **Degradation factor** | 5.9× | 17.2× | 26.0× | **286.4×** | none |
+
+**Table 9.2 — R² for y. Negative means worse than always predicting the mean.**
+
+| Test regime | Linear | Poly (2) | Forest | MLP | Physics |
+|---|---|---|---|---|---|
+| interpolation | 0.548 | 0.988 | 0.973 | 1.000 | 1.000 |
+| extrapolate v₀ low | **−1.703** | 0.569 | **−0.229** | 0.959 | 1.000 |
+| extrapolate θ low | **−1.356** | −0.012 | **−0.684** | 0.891 | 1.000 |
+| all outside at once | **−0.402** | 0.975 | **−1.073** | 0.170 | 1.000 |
+
+**Figures:** `stage8_regime_bars.png`, `stage8_extrapolation_distance.png`, `stage8_response_slice.png`,
+`stage8_trajectories.png`, `stage8_time_extrapolation.png`.
+
+## 9.4 The mechanism, made visible
+
+Table 9.1 says extrapolation is bad. `stage8_response_slice.png` says *why*, and it is the single most
+informative figure in Part I.
+
+The construction: hold θ = 45°, y₀ = 5 m and t = 1.5 s fixed, and sweep v₀ from 0 to 80 m/s while the models
+were trained only on [15, 40]. Along this slice the true answer is x = v₀·cos(45°)·1.5 — **exactly a straight
+line through the origin**. Therefore every deviation in the figure is purely the model's own inductive bias,
+with no other effect mixed in.
+
+What each model does:
+
+- **Random Forest** — follows the line inside the training range, then goes **exactly flat** in both directions.
+  This is not a failure to converge; it is the definition of the model. A forest outputs the average of training
+  targets in the leaf a point falls into, and beyond the last split threshold there are no further leaves, so
+  every input past that boundary lands in the same leaf and receives the same number. **A tree ensemble's
+  prediction is bounded by the range of its training targets, always.**
+- **Linear Regression** — a straight line, but the wrong one. It extrapolates smoothly and confidently in the
+  wrong direction, which is arguably more dangerous than the forest's obvious flat-lining.
+- **MLP** — tracks well inside the range, then wanders: it turns over and comes back down around v₀ ≈ 55 m/s.
+  Its smoothness prior decides what happens outside, and that prior knows nothing about projectile motion.
+- **Physics features** — exactly on the true line across the whole sweep, because in that basis the problem is
+  linear and the fit is exact.
+
+## 9.5 The best model in-distribution is the worst out of it
+
+The MLP achieves 0.11 m on the control — twenty times better than the forest — and degrades by **286×**. Linear
+regression degrades by only 5.9×, but from a starting point of 11 m, which is faint praise.
+
+This is not a coincidence, and it is a general property worth stating: **flexibility and extrapolation pull in
+opposite directions.** A flexible model has many ways to fit the training region well while behaving arbitrarily
+outside it. The data does not constrain it there; only its own inductive bias does. A model selected purely on
+in-distribution accuracy is therefore selected, in part, for the very property that makes it untrustworthy
+outside.
+
+## 9.6 Extrapolating forward in time
+
+A second, physically different kind of extrapolation: models were retrained using only times in the **first
+60%** of each flight, then asked about the whole flight.
+
+**Table 9.3 — Mean radial error (m) by position within the flight. The last four rows are extrapolation.**
+
+| t / t_flight | Linear | Poly (2) | Forest | MLP | Physics |
+|---|---|---|---|---|---|
+| 0.25 | 4.32 | 0.61 | 1.22 | 0.08 | 0 |
+| 0.45 | 6.21 | 1.33 | 1.65 | 0.09 | 0 |
+| 0.55 | 9.06 | 1.87 | 2.11 | 0.12 | 0 |
+| **0.65** | 15.08 | 2.59 | 7.62 | 1.02 | 0 |
+| **0.75** | 22.62 | 3.35 | 15.97 | 4.04 | 0 |
+| **0.85** | 33.43 | 4.17 | 26.76 | 10.80 | 0 |
+| **0.95** | 45.83 | 5.04 | 38.59 | 20.12 | 0 |
+
+The MLP's error rises by a factor of 170 — from 0.12 m at the edge of its data to 20.12 m at the end of the
+flight. This is the closest thing in Part I to the question that dominates Part II: *how far into the future can
+a learned model be trusted?* The answer here is "to the edge of its data, and no further".
+
+The polynomial model does best under time extrapolation (5.04 m at t/t_flight = 0.95), which is not an accident:
+it can represent t² exactly, and t² is precisely the term that governs the late part of the flight. A model
+whose functional form matches the physics degrades gracefully; one whose form does not, does not.
+
+## 9.7 What this stage establishes
+
+1. **R² = 0.99 measured interpolation, and interpolation only.** Any report quoting an in-distribution score
+   without an extrapolation test is quoting an incomplete result.
+2. **The failure mode is set by the model family, not by the amount of data.** The forest flat-lines; the linear
+   model is confidently wrong in a straight line; the network wanders. None of these is fixable by training on
+   more of the same region.
+3. **No model that was not given the physics generalises outside its training envelope.** The one that was is
+   exact everywhere — five orders of magnitude better than anything else even on the control, and unaffected by
+   extrapolation at all.
+4. **Therefore, no model learned the law.** A model that had induced x = v₀cos(θ)t would work at v₀ = 45 m/s.
+   Not one of them did. This is the quantitative form of the claim that Section 7.3 made qualitatively, and it
+   is the finding Part II builds on.
+
+---# PART II — PLANETARY MOTION
+
+---
+
+# 10. Stages 9–10 — The Physics and the Numerical Baseline
+
+Part I studied a system with a closed-form solution. Part II studies one without, and that single change
+turns out to drive every difference between the two halves of this study.
+
+## 10.1 The physics
+
+Newton's law of universal gravitation, written as an acceleration on the small body with the large body at
+the origin:
+
+> **a** = −(GM / r³) **r**    (10.1)
+
+The r³ is not a different force law — **r**/r is the unit vector, so (1/r³)**r** = (1/r²)**r̂**. Writing it
+this way avoids taking a square root twice.
+
+**Assumptions, all of which the study inherits:**
+
+| Assumption | Meaning | When it breaks |
+|---|---|---|
+| Two-body | No other planets | Real systems have perturbations; Jupiter measurably perturbs Mars |
+| Restricted | The star is fixed at the origin | Valid when m ≪ M. For Sun–Earth, m/M ≈ 3 × 10⁻⁶ |
+| Point masses | No tidal distortion, no oblateness (no J₂) | Matters for close orbits and for Earth satellites |
+| Newtonian | No general relativity | Mercury precesses 43″/century; Newtonian gravity cannot account for it |
+| No dissipation | No drag, no radiation pressure, no mass loss | Matters for low satellites and for comets |
+
+**Units.** We work in AU, years and solar masses, in which Kepler's third law forces
+
+> GM = 4π² AU³ yr⁻²    (10.2)
+
+so a 1 AU circular orbit takes exactly 1 year. This is not cosmetic: in SI the same quantities are ~10¹¹ m
+and ~10³⁰ kg, and squaring them inside an energy calculation discards precision for nothing. In AU-year units
+every quantity in the simulation is of order 1, and "0.01 AU of error" is immediately readable as 1% of the
+orbit.
+
+**Conserved quantities.** Two, and both are used as diagnostics:
+
+> E = v²/2 − GM/r   (specific energy, conserved because gravity is conservative)
+> L = x·v_y − y·v_x   (specific angular momentum, conserved because gravity is a *central* force and so
+> exerts no torque about the origin — equivalently, Kepler's second law, since dA/dt = L/2)
+
+Their value as diagnostics is that **they require no reference solution**. The true system conserves them
+exactly, so any drift is numerical error, measurable even where no exact answer is available.
+
+## 10.2 Why numerical integration is unavoidable
+
+Unlike projectile motion, (10.1) has no closed-form r(t): the acceleration depends on the position, which is
+what we are solving for. The orbit *shape* is solvable — it is a conic section, Kepler's first law — but
+position as a function of **time** requires solving Kepler's transcendental equation
+
+> E − e·sin E = M    (10.3)
+
+for the eccentric anomaly E, and (10.3) has no algebraic solution. We solve it by Newton–Raphson to a
+tolerance of 10⁻¹⁴, which gives us an **analytic reference** — a route to the exact answer that involves no
+time stepping at all, and therefore an independent check on every integrator.
+
+## 10.3 Four integrators
+
+| Method | Update | Order | Symplectic? | Force evals/step |
+|---|---|---|---|---|
+| Explicit Euler | r ← r + v Δt; v ← v + a(r) Δt | 1 | No | 1 |
+| Euler–Cromer | v ← v + a(r) Δt; r ← r + **v_new** Δt | 1 | **Yes** | 1 |
+| Velocity Verlet | r ← r + vΔt + ½aΔt²; v ← v + ½(a + a_new)Δt | 2 | **Yes** | 2 |
+| Runge–Kutta 4 | weighted average of four probes inside the step | 4 | No | 4 |
+
+Euler and Euler–Cromer differ by **one character** — which velocity the position update uses — and that
+single change is the difference between an orbit that spirals away for ever and one that stays closed.
+
+## 10.4 Results: the orbit picture
+
+Same initial condition (a = 1 AU, e = 0.3), same step size (200 steps per orbit), 40 orbits, four methods.
+`stage10_integrator_orbits.png`.
+
+| Method | Final radius / initial radius |
+|---|---|
+| Explicit Euler | **7.640** |
+| Euler–Cromer | 1.000 |
+| Velocity Verlet | 1.000 |
+| Runge–Kutta 4 | 1.000 |
+
+Explicit Euler ends at more than seven times its starting radius. The failure is not random error but a
+**systematic bias**: Euler evaluates everything at the start of the interval, so on a curving path it
+consistently overshoots outward and adds energy every step. Halving Δt halves the rate of the spiral and never
+removes it.
+
+## 10.5 Results: conservation over 200 orbits
+
+**Table 10.1 — Relative drift of E and L over 200 orbits at 400 steps/orbit**
+
+| Orbit | Method | max ǀΔE/E₀ǀ | final ǀΔE/E₀ǀ | max ǀΔL/L₀ǀ |
+|---|---|---|---|---|
+| circular (e = 0) | Euler | 7.98 × 10⁻¹ | 7.98 × 10⁻¹ | 1.22 |
+| | Euler–Cromer | 2.47 × 10⁻⁴ | 1.24 × 10⁻⁶ | 1.09 × 10⁻¹⁴ |
+| | **Velocity Verlet** | 1.52 × 10⁻⁸ | **2.52 × 10⁻¹²** | 1.89 × 10⁻¹⁴ |
+| | RK4 | 3.34 × 10⁻⁸ | **3.34 × 10⁻⁸** | 1.67 × 10⁻⁸ |
+| eccentric (e = 0.6) | Euler | 9.84 × 10⁻¹ | 9.81 × 10⁻¹ | 3.98 × 10⁻¹ |
+| | Euler–Cromer | 4.34 × 10⁻² | 1.24 × 10⁻⁵ | 1.31 × 10⁻¹⁴ |
+| | **Velocity Verlet** | 1.76 × 10⁻³ | **7.68 × 10⁻¹⁰** | 2.67 × 10⁻¹⁴ |
+| | RK4 | 4.16 × 10⁻⁵ | **4.16 × 10⁻⁵** | 4.62 × 10⁻⁶ |
+
+**Read the shape of these numbers, not just their size.** For Verlet, the *maximum* error is far larger than
+the *final* error — the error oscillates within a bounded envelope and returns. For RK4 the maximum and final
+values are identical, which is the signature of a one-way **drift**. This is the practical meaning of
+symplecticity: by backward error analysis a symplectic method solves a nearby *modified* Hamiltonian exactly,
+so its energy error is bounded for exponentially long times. RK4 is thousands of times more accurate per step
+and still loses energy secularly.
+
+Angular momentum is conserved to ~10⁻¹⁴ — machine precision — by both symplectic methods, because they
+preserve the geometric structure that the central-force symmetry implies. RK4 does not.
+
+**Practical conclusion.** Use Verlet for long-term dynamics; use RK4 when maximum accuracy over a moderate
+number of orbits matters. This study needed the latter, so RK4 generates all Part II training data.
+
+## 10.6 Results: convergence order — verifying the implementation
+
+A method of order p has global error ≈ CΔt^p, so log(error) = p·log(Δt) + const — a straight line of **slope
+p** on log-log axes. Measuring that slope is how an integrator implementation is verified; a coding error
+almost always shows up as the wrong slope.
+
+**Table 10.2 — Measured convergence order against the analytic Kepler solution**
+
+| Method | Theory | Measured at ¼ orbit | Measured at 1 full orbit |
+|---|---|---|---|
+| Explicit Euler | 1 | **0.974** | 0.623 |
+| Euler–Cromer | 1 | **0.994** | **1.998** |
+| Velocity Verlet | 2 | **1.994** | 1.997 |
+| Runge–Kutta 4 | 4 | **3.917** | 4.119 |
+
+The quarter-orbit column recovers theory exactly. Two entries in the last column need explaining, and both
+explanations are results rather than excuses.
+
+**Euler's 0.623 at a full orbit** is the asymptotic expansion failing. At coarse Δt its error is ~1–3 AU on a
+1 AU orbit; error ≈ CΔt^p only holds while the error is small, and Euler's is not.
+
+**Euler–Cromer's 1.998 at a full orbit** is more interesting, and it was investigated rather than smoothed
+over. Symplectic Euler is **conjugate** to Störmer–Verlet: the two produce the same trajectory up to a fixed
+O(Δt) change of coordinates (Hairer, Lubich & Wanner 2006). That coordinate shift is periodic with the orbit,
+so sampling after a whole period cancels it and exposes the underlying second-order behaviour. This was
+confirmed by measuring at a quarter period as well — where the order comes out at 0.994, exactly as theory
+says. Both measurements are in `results/stage10_convergence.csv` and both panels are in the figure.
+
+## 10.7 Results: Kepler's third law emerges
+
+The simulator was told only Newton's inverse-square law. Kepler's third law T² ∝ a³ was never imposed.
+
+**Table 10.3 — Orbital period measured from simulation**
+
+| a (AU) | T theory (yr) | T measured (yr) | Relative error |
+|---|---|---|---|
+| 0.4 | 0.252982 | 0.252982 | 1.4 × 10⁻¹³ |
+| 1.0 | 1.000000 | 1.000000 | 1.4 × 10⁻¹³ |
+| 2.0 | 2.828427 | 2.828427 | 1.5 × 10⁻¹³ |
+| 5.0 | 11.180340 | 11.180340 | 1.4 × 10⁻¹³ |
+
+**Fitted log–log slope: 1.500000** against Kepler's 3/2.
+
+This is an end-to-end validation that the simulator reproduces celestial mechanics rather than merely being
+self-consistent, and it runs in the historically correct direction: Kepler's law is *derived from* Newton's,
+not assumed alongside it.
+
+## 10.8 Computational cost
+
+| Method | µs per step (pure Python) | Force evaluations |
+|---|---|---|
+| Explicit Euler | 5.64 | 1 |
+| Euler–Cromer | 5.49 | 1 |
+| Velocity Verlet | 10.02 | 2 |
+| Runge–Kutta 4 | 27.87 | 4 |
+
+Cost tracks force evaluations almost exactly, as it should. The right-hand panel of
+`stage10_convergence.png` replaces Δt with force evaluations on the x axis — the fair comparison — and RK4
+still wins by many orders of magnitude at equal cost. Higher order is not merely more accurate per step here;
+it is more accurate per unit of work.
+
+## 10.9 The error budget for Part II
+
+This is the number that licenses everything in Section 11.
+
+The reference used for all Stage 11 experiments is RK4 with Δt_store = 0.004 yr and **ten internal substeps**.
+Separating those two intervals is deliberate: Δt_store is what the ML model steps over, so it must be large
+enough that a five-orbit rollout is ~1,250 model calls rather than tens of thousands; Δt_integrate must be
+small enough that the ground truth carries no visible error of its own. One value for both would force a bad
+compromise.
+
+**Measured reference accuracy:**
+
+| Check | Result |
+|---|---|
+| RK4 vs analytic Kepler, 2 orbits, e = 0.0 | 4.6 × 10⁻¹⁴ AU |
+| RK4 vs analytic Kepler, 2 orbits, e = 0.6 | 8.1 × 10⁻¹³ AU |
+| Reference trajectory over the full 5-year horizon | ≈ 3 × 10⁻¹¹ AU |
+
+The smallest ML error measured anywhere in Section 11 is 6.4 × 10⁻⁵ AU — **six orders of magnitude larger**.
+The reference is therefore exact for present purposes, and that statement is quantitative rather than
+rhetorical.
+
+## 10.10 The dataset
+
+60 training and 20 held-out trajectories, a ∈ [0.8, 1.2] AU, e ∈ [0.0, 0.4], three orbits each, sampled every
+0.004 yr: **44,285 one-step training pairs**. Worst relative energy drift across the whole training set:
+5.4 × 10⁻¹². Trajectory 0 differs from the analytic Kepler solution by at most 1.2 × 10⁻¹⁰ AU.
+
+Varying a and e is essential rather than decorative. A model trained on one single orbit has no way to
+distinguish "the law of motion" from "this particular curve", and would be a lookup table in disguise. Varying
+the orbit forces any one-step model to learn a mapping that genuinely depends on the **state**.
+
+---# PART III — SYNTHESIS
+
+---
+
+# 13. Stage 13 — Physics-Informed Machine Learning
+
+Sections 9 and 11 are diagnostic: they establish *where* a standard ML pipeline fails and why. This section
+is constructive. It asks whether putting the physics **into the model** rather than only into the data changes
+the failure modes — and it tests three levels of doing so under identical conditions.
+
+| Level | What is injected | Guarantee | What it needs to know |
+|---|---|---|---|
+| **13a — hard** | A basis in which the solution is linear | Exact by construction | The **solution** |
+| **13b — soft** | The differential equation, as a loss penalty | Approximate | Only the **equation** |
+| control | Nothing | None | Only data |
+
+The three-level structure follows the taxonomy in Karniadakis et al. (2021): inductive bias (built into the
+architecture), learning bias (built into the loss), and observational bias (built into the data alone).
+
+## 13.1 Level (a) — hard constraints: fitting in a physics basis
+
+The exact solution is x = (v₀cos θ)·t and y = y₀ + (v₀sin θ)·t − (g/2)·t². So in the basis
+
+> [ v₀cos(θ)t , v₀sin(θ)t , y₀ , t² ]
+
+both targets are **linear**, with coefficients that are known in advance. Ordinary linear regression in that
+basis should therefore be exact.
+
+**Learned coefficients:**
+
+| | v₀cos(θ)t | v₀sin(θ)t | y₀ | t² |
+|---|---|---|---|---|
+| **x** | 1.000000 | −0.000000 | 0.000000 | −0.000000 |
+| **y** | −0.000000 | 1.000000 | 1.000000 | **−4.905000** |
+
+with intercepts of −0.000000. The t² coefficient for y is **−4.905000**, and −g/2 = −4.905000.
+
+**The fit recovered the gravitational acceleration of the simulation to six decimal places.** This is the
+closest anything in this study comes to "extracting physics from data" — and the qualification matters: we
+supplied the functional form and the fit supplied only the constant. That is parameter estimation, not
+discovery. It is a hand-specified, four-term version of what SINDy (Brunton et al. 2016) does by searching a
+large library with a sparsity penalty.
+
+This model's error is ~10⁻¹³ m **everywhere**, including in all six extrapolation regimes of Stage 8 (Table
+9.1), because a correct functional form has no inside or outside.
+
+## 13.2 Level (b) — the PINN: soft constraints from the equation alone
+
+A PINN's loss has three terms instead of one:
+
+> L = w_d·L_data + w_p·L_physics + w_i·L_IC
+
+where L_data is the ordinary supervised term, and the other two need **no labels at all**. They are evaluated
+at **collocation points** — arbitrary inputs where we have no measurement but do know the answer must obey
+
+> d²x/dt² = 0   and   d²y/dt² = −g    (13.1)
+
+subject to x(0) = 0, y(0) = y₀, x′(0) = v₀cos θ, y′(0) = v₀sin θ.    (13.2)
+
+Together (13.1) and (13.2) determine the solution **uniquely**, which means a PINN can in principle be trained
+with zero labelled examples. Section 13.4 tests exactly that.
+
+### Implementation notes (and why they are in the report)
+
+**Written from scratch in NumPy.** Every other model in this study came from scikit-learn, which was the right
+tool. A PINN is not standard supervised regression: its loss contains derivatives of the model's own output
+with respect to its own input, which no scikit-learn estimator exposes. Using PyTorch would have hidden the
+one mechanism this section exists to explain. So `src/pinn.py` implements the forward pass, backpropagation
+and Adam explicitly, in about 120 lines.
+
+**Derivatives by central difference, not autodiff.**
+
+> d²f/dt² ≈ [ f(t+h) − 2f(t) + f(t−h) ] / h²    (13.3)
+
+Automatic differentiation would require differentiating *twice* through the network. With (13.3), the residual
+is built from three ordinary **forward** passes, so the gradient with respect to the weights is plain
+backpropagation — everything stays first-order and hand-checkable. Truncation error is O(h²) ≈ 10⁻⁴ at
+h = 0.01 s, thousands of times below the model error we are trying to reduce. The real trade-off is scaling:
+finite differences cost an extra pair of forward passes per derivative direction, so they would be a poor
+choice for a PDE in many dimensions. For one direction — time — they are strictly simpler.
+
+**tanh, not ReLU.** A ReLU network is piecewise linear, so its second derivative is zero almost everywhere: it
+is *structurally incapable* of satisfying (13.1), which demands a specific non-zero curvature. tanh is smooth
+and infinitely differentiable.
+
+**The initial-condition term is mandatory.** (13.1) alone is satisfied by *every* parabola with the right
+curvature, regardless of where it starts. Omitting (13.2) is the most common way a hand-written PINN silently
+fails: it converges to a perfect physics loss and completely wrong positions.
+
+**All three loss terms are normalised to be dimensionless and O(1)** before weighting — the physics residual by
+g, the data term by the target standard deviation, the IC terms by the spreads of y₀ and v₀. Without this the
+data term (measured in m², typical value ~10²) would outweigh the physics term (dimensionless, ~1) by two
+orders of magnitude and `physics_weight` would not mean what it says. Karniadakis et al. (2021) flag loss
+balancing as an open problem; this is a defensible convention, not a solution.
+
+**Gradient verification.** Because the gradients are hand-derived, all three were checked against central
+finite differences of the loss:
+
+| Loss term | Max gradient error | Relative to largest gradient |
+|---|---|---|
+| Data | 6.2 × 10⁻¹⁰ | — |
+| Physics | 6.2 × 10⁻⁶ | **8.6 × 10⁻⁷** |
+| Initial conditions | 5.0 × 10⁻⁹ | — |
+
+The physics figure is larger in absolute terms only because that loss carries a factor 1/h² = 10⁴ which
+amplifies both the true gradient and the finite-difference noise; 10⁻⁶ relative is the expected floor.
+
+## 13.3 Design of the comparison
+
+The control is not a strawman. **The "plain network" is the same class with `physics_weight = 0`** — same
+architecture (32-32 tanh), same initialisation scheme, same Adam optimiser and learning rate, same 4,000
+epochs, same collocation points. The only difference between the two arms is the loss. Any gap is therefore
+attributable to the physics term and to nothing else. Three seeds per configuration; every number below is a
+mean over them.
+
+## 13.4 Results: data efficiency
+
+**Table 13.1 — Mean radial test error (m), mean ± SD over three seeds**
+
+| Labelled points | PINN | Plain NN | Ratio |
+|---|---|---|---|
+| **0** | **1.392 ± 0.174** | *(cannot be trained)* | — |
+| 10 | 1.279 ± 0.086 | 21.399 ± 1.238 | **16.7×** |
+| 20 | 0.893 ± 0.104 | 14.995 ± 0.536 | **16.8×** |
+| 50 | 0.742 ± 0.045 | 7.925 ± 0.736 | **10.7×** |
+| 100 | 0.546 ± 0.071 | 3.739 ± 0.131 | 6.9× |
+| 200 | 0.548 ± 0.086 | 0.811 ± 0.033 | 1.5× |
+| 500 | 0.466 ± 0.053 | 0.567 ± 0.107 | 1.2× |
+| 2,000 | 0.429 ± 0.047 | 0.364 ± 0.060 | 0.85× |
+
+**Figure:** `stage13_data_efficiency.png`.
+
+**The headline.** A PINN trained on **zero labelled points** reaches 1.39 m. The plain network needs roughly
+**200 labelled points** to match that. The physics term is worth about two orders of magnitude of data in the
+scarce-data regime.
+
+**The honest right-hand side of the table.** At 2,000 labels the two are equivalent within the spread of the
+seeds (0.429 ± 0.047 vs 0.364 ± 0.060) — and if anything the plain network is marginally ahead. **Physics-
+informed learning is a low-data technique.** A report that showed only the left-hand side would be
+overselling it, and the figure deliberately includes the crossover.
+
+**Why the PINN plateaus around 0.4–0.5 m rather than reaching machine precision.** The physics constraint is a
+*penalty*, not a guarantee: the optimiser trades a small residual against the other terms, and the finite
+network capacity and finite training length set a floor. That is precisely the difference between level (a)
+and level (b) — the hard-constraint model of Section 13.1 cannot violate the physics at all and is exact at
+10⁻¹³ m.
+
+## 13.5 Results: physics fills in where data runs out
+
+This is the most persuasive experiment in the section, and `stage13_extrapolation.png` is the figure to show.
+
+Both networks receive labelled points from **only the first 40% of each flight**. The PINN additionally
+receives collocation points — inputs with no labels attached — covering the whole flight, where the only thing
+it is told is that (13.1) must hold.
+
+**Table 13.2 — Mean radial error (m) inside and beyond the labelled time window**
+
+| Region | PINN | Plain NN | Ratio |
+|---|---|---|---|
+| Inside the labelled window (t/t_flight < 0.4) | 0.292 | 0.469 | 1.6× |
+| **Beyond it (t/t_flight > 0.4)** | **1.343** | **19.737** | **14.7×** |
+
+Inside the data, both are fine. Beyond it, the plain network is extrapolating in exactly the sense of Section
+9 and it wanders — visibly flying upward off the parabola. The PINN has no data there either, but it is not
+unconstrained: it still has to satisfy d²y/dt² = −g, and that single requirement very nearly pins the
+trajectory down.
+
+**This is the practical content of the phrase "physics-informed".** A physical law is a statement about
+everywhere, so it can constrain a model in regions where no measurement exists. Nothing a purely data-driven
+model can be given has that property — which is the deep reason Section 9's extrapolation failures were not
+fixable with more data of the same kind.
+
+## 13.6 Results: is the output physically possible?
+
+Position error asks *is it in the right place*. The residual of (13.1) asks a different question: *could
+anything obeying Newton's laws move like this at all?* The same finite-difference measurement was applied to
+every model in the study, so the numbers are directly comparable.
+
+**Table 13.3 — Physical-consistency audit. For scale, g = 9.81 m/s².**
+
+| Model | Mean radial error (m) | ǀd²x/dt²ǀ (m/s²) | ǀd²y/dt² + gǀ (m/s²) |
+|---|---|---|---|
+| Linear Regression | 10.691 | **0.000** | **9.810** |
+| Polynomial Ridge (deg 2) | 1.857 | 0.239 | 0.332 |
+| **Random Forest** | **2.652** | **2015.79** | **1494.89** |
+| Neural Network (MLP) | 0.146 | 1.648 | 1.699 |
+| Physics-Informed Features (hard) | **0.000** | **0.000** | **0.000** |
+| PINN (data + physics, soft) | 0.858 | 0.207 | 0.210 |
+| Plain NN (same net, data only) | 12.415 | 5.426 | 9.655 |
+
+**Figure:** `stage13_physics_residual.png`.
+
+Three rows deserve comment, and each is a different lesson.
+
+**Linear Regression: residual_x exactly 0, residual_y exactly 9.81.** Its prediction is a straight line in t,
+so d²x/dt² = 0 — which happens to be *correct*. And d²y/dt² = 0 too, so ǀ0 + gǀ = 9.81 — the maximum possible
+error, because the model has no curvature at all. Both numbers are exactly what the model's functional form
+implies, which is a satisfying check that the measurement is doing what it claims.
+
+**Random Forest: position error 2.65 m, residual ~2,000 m/s².** This is the important row. By RMSE the forest
+is one of the better models; by physical consistency it is by far the worst, off by a factor of 200 relative
+to g. The reason is the staircase structure of Sections 6.4 and 9.4: a forest's output is piecewise constant
+in t, jumping between leaf values, so its numerical second derivative is enormous even where its positions are
+good. **The two evaluation questions come apart completely, and only one of them is usually asked.**
+
+**The two physics-informed models are the only ones with small residuals**, at 0.000 and ~0.21 m/s². That is
+the point of the whole section: they are the only models that were told what the equation is.
+
+## 13.7 What this stage establishes — and what it does not
+
+**Establishes:**
+1. The differential equation can substitute for roughly two orders of magnitude of labelled data.
+2. Physics in the loss constrains a model where no data exists, which no amount of data of the same kind can do.
+3. Physical consistency is a distinct evaluation axis from position error, and models can score well on one
+   while failing badly on the other.
+4. Hard constraints (a correct basis) beat soft constraints (a penalty) by ten orders of magnitude when the
+   solution is known — but they require knowing the solution, which is exactly the case where one would not
+   need machine learning.
+
+**Does not establish:**
+1. **That PINNs beat plain networks in general.** At 2,000 labels they are equivalent here.
+2. **That the PINN discovered physics.** It was *told* d²y/dt² = −g. It learned a function consistent with
+   what it was told — a different and much weaker claim than discovery.
+3. **That PINNs are fast.** The PINN takes ~6 s to train against ~0.6 s for the plain network, and both are
+   infinitely slower than evaluating the closed-form solution. Raissi et al. (2019) position PINNs for problems
+   where data and physics are *both* partial; that is not this problem, and this section is a controlled
+   demonstration of the mechanism, not a recommendation to use a PINN for projectile motion.
+
+---
 # 10. How To Reproduce This Project From Scratch
 
 A reader with no ML background should be able to rebuild this entire project by following these steps.
