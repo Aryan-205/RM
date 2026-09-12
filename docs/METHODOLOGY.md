@@ -227,9 +227,9 @@ second law in the report's theory section.
 
 ## 4.2 Planetary motion — validated against the analytic Kepler solution
 
-There is no closed-form r(t) for the two-body problem, so the reference trajectories are
-numerical. That makes the reference a potential source of error, and it was checked rather than
-assumed, in four independent ways:
+The generic eccentric Kepler orbit requires a numerical root solve rather than an elementary
+explicit r(t). This project also integrates the equations in time, so the reference trajectories
+have numerical error. That error was checked rather than assumed, in four independent ways:
 
 1. **Against the analytic Kepler solution.** Position as a function of time *is* obtainable for a
    Kepler orbit by solving E − e sin E = M numerically for the eccentric anomaly (Newton–Raphson,
@@ -476,9 +476,10 @@ dropped, so an unstable model is not silently flattered. *Control:* one fixed se
 trajectories and one fixed set of test initial conditions for every arm.
 
 ### Stage 12 — System vs system
-Identical formulation, identical model families, identical 20,000 training pairs, identical
-number of steps per natural period, in both systems. *Control:* the formulation, which was the
-whole reason for §5.4.
+The same formulation and model families, with 20,000 training pairs in each system. The fixed step sizes are 0.02 s and 0.004 yr; the number of
+steps per natural timescale is not matched. One-step and learning-curve scores use the training
+pool (with overlap); rollout tests use separate trajectories. See report Section 12 for these
+qualifications. *Control:* the shared flow-map formulation.
 
 ### Stage 13 — Physics-informed learning
 Label counts {0, 10, 20, 50, 100, 200, 500, 2000} × {PINN, plain} × 3 seeds. *Control:* the plain
@@ -492,8 +493,8 @@ optimiser, learning rate, epochs and collocation points.
 ## 9.1 Determinism
 
 Every stochastic step is seeded: dataset generation (`np.random.default_rng(seed)`), train/test
-splits (`random_state`), model initialisation (`random_state` / `seed`), and subset draws. Running
-any script twice on the same machine produces byte-identical CSVs.
+splits (`random_state`), model initialisation (`random_state` / `seed`), and subset draws. Scientific metrics should reproduce within numerical tolerance in the recorded environment.
+Timing columns vary with machine load, so CSVs containing timings are not byte-identical.
 
 ## 9.2 Full reproduction
 
@@ -587,8 +588,8 @@ than declaring a winner.
    orders of magnitude. RK4 holds ~10⁻¹¹ AU over five years; the best learned rollout exceeds
    0.01 AU within about a third of one orbit.
 2. **That any model discovered a physical law.** Every model was trained on data generated *from*
-   the law. The two models that reproduce the physics exactly are the two that were *handed* it
-   (physics features, PINN), which is the opposite of discovery.
+   the law or constrained by it. Physics features recover an exact form here; the PINN is
+   approximate. Neither is evidence of discovering the equation.
 3. **That these results transfer to real experimental data**, to chaotic systems, or to
    model scales far larger than those tested.
 4. **That the Stage 11 rollout numbers represent what learned simulators can do.** See §10.2.6.

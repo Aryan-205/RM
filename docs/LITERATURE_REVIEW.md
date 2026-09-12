@@ -643,7 +643,6 @@ Verified bibliographic details. Sorted alphabetically by first author.
 
 Sources 1–18 were checked against publisher records for author list, year, journal, volume and
 page range before being included. Where this document summarises a paper's findings, the summary
-is of its abstract and headline results, not of a full replication — with the exception of Raissi
-et al. (2019), Greydanus et al. (2019), Sanchez-Gonzalez et al. (2020) and Breen et al. (2020),
-whose central phenomena are independently reproduced at small scale in Stages 11 and 13 of this
-project and can be compared directly against the numbers in `results/`.
+is of its abstract and headline results, not of a full replication — Stages 11 and 13 illustrate related themes at small scale, but do not replicate those
+papers' architectures or experiments. The project does not implement a Hamiltonian network,
+a graph simulator or a chaotic three-body model.

@@ -1,0 +1,13 @@
+criterion,projectile_score,planetary_score,projectile_note,planetary_note
+"One-step accuracy
+(relative, best model)",1.0,2.620751495554563e-12,9.0e-17,3.4e-05
+"Accuracy after one full period
+(rolled out, relative)",1.0,1.0958223560515886e-14,3.0e-15,2.7e-01
+"Insensitivity to initial conditions
+(1 / amplification over one period)",1.0,0.19093864590184825,1.4x,7.4x
+"Training cost
+(fastest model, seconds)",0.29608022628742603,1.0,0.06 s,0.02 s
+"Inference cost
+(fastest model, us/prediction)",0.5537382987373785,1.0,0.21 us,0.11 us
+"Is the exact flow map inside
+any model's hypothesis space?",1.0,0.05,yes -- it is affine,no -- it contains 1/r^3

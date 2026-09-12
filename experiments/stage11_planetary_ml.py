@@ -175,9 +175,9 @@ def rollout_curves(fitted, times, truths, states0):
         error = np.linalg.norm(predicted[:, :, 0:2] - truths[:, :, 0:2], axis=2)
 
         # A NaN means the rollout escaped the system (see OneStepModel.rollout).
-        # Those points are not missing data -- the error really is at least the
-        # divergence radius -- so we substitute that lower bound rather than
-        # dropping them, which would silently flatter an unstable model.
+        # Retain escaped runs using a fixed failure penalty. The radius is not
+        # an exact lower bound on position error; late means depend on this
+        # convention, so also report escape fractions and usable horizons.
         escaped = ~np.isfinite(error)
         error_filled = np.where(escaped, DIVERGENCE_RADIUS, error)
         escape_fraction = escaped.any(axis=0).mean()
@@ -529,7 +529,13 @@ if __name__ == "__main__":
                       RESULTS / "stage11_error_growth.png")
 
     representative_rollouts = pd.concat(
-        [panels[name]["diagnostics"].assign(model=name) for name in MODELS],
+        [panels[name]["diagnostics"].assign(
+            model=name,
+            **{f"predicted_{column}": panels[name]["predicted"][:, i]
+               for i, column in enumerate(STATE_COLUMNS)},
+            **{f"truth_{column}": panels[name]["truth"][:, i]
+               for i, column in enumerate(STATE_COLUMNS)},
+        ) for name in MODELS],
         ignore_index=True,
     )
     representative_rollouts.to_csv(

@@ -255,9 +255,9 @@ will not survive a follow-up.
 ### ❓ Did the model discover Newton's laws?
 
 > **"No, and I'd resist that framing quite firmly."** I generated the training data *from* Newton's
-> laws, so the information was in the data by construction. The two models that reproduce the
-> physics exactly are the two I *handed* it to — the physics-feature model and the PINN — which is
-> the opposite of discovery.
+> laws, so the information was in the data by construction. The physics-feature model is exact
+> to round-off because I supplied the correct basis. The PINN remains approximate and receives
+> the differential equation and initial conditions. Neither discovered the law.
 >
 > Stage 8 is the evidence. A model that had genuinely induced x = v₀cos(θ)t would work at
 > v₀ = 45 m/s. Every model that wasn't given the physics failed there. That's a model that learned
@@ -301,7 +301,9 @@ will not survive a follow-up.
 >
 > In Stage 12 I had a real confound: Part I used a closed-form map and Part II used a stepped flow
 > map, so comparing them would confound the *system* with the *formulation*. I fixed it by
-> re-expressing projectile motion as a one-step flow map too, so only the physics differs.
+> re-expressing projectile motion as a one-step flow map too. Sampling intervals and state
+> distributions still differ. Stage 12 one-step scores use training pairs; its separate rollout
+> tests provide the predictive comparison. I report these remaining limitations.
 >
 > In Stage 13 the "plain network" is the same class with `physics_weight = 0` — same architecture,
 > same initialisation, same optimiser, same epochs. Any gap is the loss function and nothing else.
@@ -324,8 +326,8 @@ will not survive a follow-up.
 > 4. Kepler's third law emerges with fitted slope 1.500000, from a simulator only told the
 >    inverse-square law.
 >
-> The reference error over my whole 5-year horizon is 3 × 10⁻¹¹ AU and my smallest ML error is
-> 6.4 × 10⁻⁵ AU — six orders of magnitude larger. So I can say the reference is exact *for this
+> The representative reference error over five years is 3 × 10⁻¹¹ AU and the smallest Stage 11
+> held-out one-step position error is 3.2 × 10⁻⁵ AU — six orders of magnitude larger. So I can say the reference is exact *for this
 > purpose*, quantitatively.
 
 ### ❓ You wrote the PINN by hand. How do you know the gradients are right?
@@ -452,8 +454,9 @@ will not survive a follow-up.
 > to it.
 >
 > The interesting part is what *isn't* just curve fitting. The physics-feature model and the PINN
-> are exact or near-exact everywhere, including far outside the training range, because they were
-> given structure rather than more points. That contrast is the argument of the project.
+> behave differently: the correct physics basis is exact to round-off in these ideal conditions;
+> the PINN improves the tested extrapolation error by 14.7× but is not exact everywhere. Both
+> receive physical information beyond labelled positions.
 
 ### ❓ "Your data is fake, so your results are meaningless."
 

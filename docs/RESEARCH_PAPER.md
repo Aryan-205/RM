@@ -12,10 +12,10 @@
 
 This study asks whether machine learning can learn and predict physical motion, and how its performance
 depends on the dynamical character of the system it is applied to. Two systems are used: **projectile
-motion**, which has a closed-form solution, and **two-body orbital motion**, which does not. Both are
-simulated exactly, so that every error measured is attributable to the learning algorithm and to nothing
-else. Five model families are compared — linear regression, degree-2 polynomial ridge, random forest, a
-multilayer perceptron, and two physics-informed models — under a design in which one factor is manipulated
+motion**, which has an elementary closed-form solution, and **two-body orbital motion**, whose analytic Kepler
+solution requires a numerical root solve. Analytic projectile trajectories and independently validated
+numerical orbital trajectories provide references with quantified errors. Four standard model families are compared — linear regression, degree-2 polynomial ridge, random forest, a
+multilayer perceptron — alongside two physics-informed approaches — under a design in which one factor is manipulated
 at a time.
 
 **Part I (projectile motion).** On held-out data drawn from the training distribution, a Random Forest
@@ -41,10 +41,10 @@ of an orbit. Perturbing the exact dynamics shows that separation grows only **li
 problem is integrable, so the divergence is compounding model error, not chaos.
 
 **Comparison.** With the problem formulation, model family and data volume all held fixed, and errors
-normalised by each system's own characteristic length, the difference between the two systems is shown to be
-structural rather than statistical. The exact projectile flow map is **affine**, and ordinary linear
-regression recovers it to ~10⁻¹⁴ m; the orbital flow map contains 1/r³ and lies inside no tested model's
-hypothesis space.
+normalised by each system's own characteristic length, the comparison exposes an important
+structural difference, subject to the sampling qualifications in Section 12. The exact projectile flow map is **affine**, and ordinary linear
+regression recovers it to ~10⁻¹⁴ m; the orbital acceleration contains 1/r³, and none of these fitted unconstrained models reproduces
+the orbital flow map exactly.
 
 **Physics-informed models.** A physics-informed neural network, implemented from scratch in NumPy with every
 gradient verified against finite differences, reaches 1.39 m trained on **zero labelled points** — a level a
@@ -54,9 +54,9 @@ that fits in a physics basis is exact to floating-point round-off everywhere, in
 training range, and recovers −g/2 = −4.905000.
 
 **Conclusion.** Machine learning is not equally effective for the two systems, and the study locates the
-difference precisely. Throughout, classical physics remains superior by roughly ten orders of magnitude; no
-model discovered a physical law, and the two that reproduce the physics exactly are the two that were handed
-it.
+difference precisely. For long orbital rollouts, the classical reference remains orders of magnitude more accurate. No
+model discovered a physical law; exact projectile fits arise where the correct function is already
+contained in the chosen representation.
 
 **Keywords:** computational physics, supervised regression, surrogate models, learned simulators, error
 accumulation, symplectic integration, physics-informed neural networks, extrapolation, synthetic data.
@@ -67,22 +67,22 @@ accumulation, symplectic integration, physics-informed neural networks, extrapol
 
 This report serves two purposes at once.
 
-1. **As a research paper.** Sections 1, 2, 4, 6–13 follow the standard RM structure (Introduction, Theory,
+1. **As a research paper.** Sections 1, 2, 4, 6–14 follow the standard RM structure (Introduction, Theory,
    Methodology, Results, Discussion, Conclusion) and read as a conventional academic report.
 
 2. **As a complete build guide for a reader with no AI/ML background.** Section 3 teaches every
    machine-learning concept used, from nothing. Section 5 contains the code in the order it was written.
-   Section 14 is a reproduction recipe that starts from an empty folder.
+   Section 15 explains how to reproduce the study from the repository.
 
 If you know no machine learning at all, read in this order: **Section 3 → Section 2 → Section 5 →
-Section 14**, then return to the rest.
+Section 15**, then return to the rest.
 
 **Companion documents.** The formal methodology chapter is `docs/METHODOLOGY.md`; the literature review, with
-24 verified sources, is `docs/LITERATURE_REVIEW.md`; the talk plan is `docs/PRESENTATION_OUTLINE.md`; viva
+23 verified sources, is `docs/LITERATURE_REVIEW.md`; the talk plan is `docs/PRESENTATION_OUTLINE.md`; viva
 questions and answers are in `docs/VIVA_PREP.md`.
 
-**Provenance of every number.** Every figure quoted here was produced by running the code in this repository,
-and is stored in a CSV under `results/` alongside the figure generated from it. No result has been estimated,
+**Provenance of every number.** Figures were produced by the repository scripts; numerical result tables are stored under `results/`.
+Some illustrative curves are recomputed directly from the equations rather than saved as separate CSVs. No result has been estimated,
 rounded from memory, or invented, and no figure was drawn or adjusted by hand. `python run_all.py` regenerates
 all of it in about 49 minutes.
 
@@ -114,7 +114,7 @@ all of it in about 49 minutes.
 15. How To Reproduce This Project From Scratch
 16. References
 
-- Appendix A — Complete File Listings
+- Appendix A — Source File Index
 - Appendix B — Glossary
 - Appendix C — Viva Preparation
 - Appendix D — Index of Every Figure and Table
@@ -188,8 +188,8 @@ diverging sharply, which is the gap this study addresses at its own scale.
 | 4 | How does the amount of training data affect accuracy? | **Stage 7 — in progress** |
 | 5 | Does the model generalise outside its training range? | Stage 8 — planned |
 
-**Sub-questions deferred to Part II:** applicability to planetary motion, error accumulation over time, and
-whether increased dynamical complexity increases prediction error.
+**Sub-questions addressed in Part II:** applicability to planetary motion, error accumulation over time,
+and how predictive performance differs between physical systems.
 
 ## 1.5 Objectives
 
@@ -203,12 +203,14 @@ whether increased dynamical complexity increases prediction error.
 
 ## 1.6 Scope and Delimitations
 
-**In scope:** two-dimensional projectile motion under constant gravity; synthetic, noise-free data; classical
-(non-deep) regression models; single-step position prediction.
+**In scope for the complete study:** ideal two-dimensional projectile and restricted two-body
+orbital motion; noise-free synthetic data; linear, polynomial, forest and neural models; direct
+and recursive prediction; physical constraints and numerical-reference validation.
 
-**Out of scope for Part I:** air resistance, spin/Magnus effects, wind, three-dimensional motion, real
-experimental measurements, neural networks, and time-series/recursive prediction. Each of these is a deliberate
-delimitation, and each is revisited in Section 7.5 (Limitations).
+**Out of scope:** air resistance, spin/Magnus effects, wind, three-dimensional motion and real
+experimental measurements. The introductory Stages 0–6 omit neural networks and recursive
+prediction; the later stages add them. Section 7.5 records the initial scope, while Section 14
+states the limitations of the complete study.
 
 ---
 
@@ -1514,10 +1516,10 @@ orbit.
 Their value as diagnostics is that **they require no reference solution**. The true system conserves them
 exactly, so any drift is numerical error, measurable even where no exact answer is available.
 
-## 10.2 Why numerical integration is unavoidable
+## 10.2 Two independent routes to position at a given time
 
-Unlike projectile motion, (10.1) has no closed-form r(t): the acceleration depends on the position, which is
-what we are solving for. The orbit *shape* is solvable — it is a conic section, Kepler's first law — but
+Unlike projectile motion, the generic eccentric orbit has no elementary explicit r(t). Numerical
+time integration is one route; solving the analytic Kepler parametrisation is another. The orbit *shape* is solvable — it is a conic section, Kepler's first law — but
 position as a function of **time** requires solving Kepler's transcendental equation
 
 > E − e·sin E = M    (10.3)
@@ -1676,7 +1678,280 @@ Varying a and e is essential rather than decorative. A model trained on one sing
 distinguish "the law of motion" from "this particular curve", and would be a lookup table in disguise. Varying
 the orbit forces any one-step model to learn a mapping that genuinely depends on the **state**.
 
----# PART III — SYNTHESIS
+
+# 11. Stage 11 — Machine Learning for Orbital Motion
+
+A simulator must do more than predict the next point when the correct current state is supplied.
+After the first step it must operate on its **own previous prediction**. This stage measures the
+consequences of that change, using the independently validated reference from Section 10.
+
+## 11.1 Design
+
+| Design element | Implementation |
+|---|---|
+| Independent variables | Model family; absolute versus delta targets; flow-map, direct-map or history formulation; training-set size |
+| Dependent variables | One-step position error, rollout error, tolerance-crossing time, conservation error and escape fraction |
+| Training data | 60 trajectories; 44,285 adjacent state pairs; three orbits per trajectory |
+| One-step test data | Separate trajectories generated with a different seed; pairs never cross a trajectory boundary |
+| Rollout evaluation | 20 unseen initial conditions; 5 years; Δt = 0.004 yr, giving 1,250 recursive steps |
+| Controlled | Model hyperparameters within each family, physical law, reference solver and evaluation conditions |
+| Numerical baseline | RK4 with substeps, checked against the analytic Kepler solution; representative maximum discrepancy ≈ 3 × 10⁻¹¹ AU |
+
+The state is s = (x, y, vₓ, vᵧ). **Approach A** learns s(t) → s(t + Δt).
+In its delta form it instead learns the change Δs, and adds that change to the current state.
+**Approach B** learns (a, e, t) → s directly, so a prediction at a late time does not depend
+on earlier predictions. **Approach C** supplies three consecutive states rather than one.
+These alternatives change the prediction task; they are not simply three names for the same model.
+
+## 11.2 One-step accuracy: predicting the change helps some models
+
+**Table 11.1 — Mean held-out one-step position error (AU).**
+Source: `results/stage11_one_step_accuracy.csv`.
+
+| Model | Absolute target | Delta target | Absolute / delta error |
+|---|---:|---:|---:|
+| Linear | 5.258 × 10⁻⁵ | **5.258 × 10⁻⁵** | 1.00× |
+| Polynomial, degree 2 | 3.203 × 10⁻⁵ | **3.203 × 10⁻⁵** | 1.00× |
+| Random Forest | 2.499 × 10⁻² | **8.691 × 10⁻⁴** | 28.8× |
+| MLP | 1.800 × 10⁻³ | **6.448 × 10⁻⁵** | 27.9× |
+
+**Figure 11.1 — `results/stage11_one_step_accuracy.png`.** Compare the two bars within each
+model before comparing models. The target reparametrisation substantially helps the forest and
+network, while the linear and polynomial fits are effectively unchanged.
+
+For a small step, the next state is close to the present state. Learning the small correction
+reduces the burden of representing the identity map. Linear regression already includes that map:
+subtracting the input from the target changes its coefficients, without enriching its function
+class. The polynomial model contains linear terms as well. Its ridge regularisation means exact
+invariance is not guaranteed, but the measured difference is negligible here.
+
+The polynomial model has the smallest delta **position** error in this table. That does not make
+it the best simulator: velocity error and repeated application also matter.
+
+## 11.3 Rollout: local accuracy is not a usable forecast horizon
+
+**Table 11.2 — Median time to cross a position-error tolerance (years).**
+Source: `results/stage11_horizons.csv`; all 20 orbits cross each listed tolerance within the run.
+
+| Model | 0.001 AU | 0.01 AU | 0.1 AU |
+|---|---:|---:|---:|
+| Linear | 0.020 | **0.062** | 0.192 |
+| Polynomial, degree 2 | 0.028 | **0.091** | 0.312 |
+| Random Forest | 0.007 | **0.076** | 0.386 |
+| MLP | 0.039 | **0.372** | 0.973 |
+
+The MLP's 6.448 × 10⁻⁵ AU one-step error becomes a **0.01 AU error within 0.372 years**,
+approximately 93 model steps and roughly one-third of a year-scale orbit. A tolerance must always
+accompany a horizon: accepting 0.1 AU extends the same model's median horizon to 0.973 years.
+
+**Figure 11.2 — `results/stage11_error_growth.png`.** The left panel shows mean position error
+and the middle 50% of the unseen-orbit distribution; the right panel shows Table 11.2. The y-axis
+starts at 10⁻⁵ AU so the learned curves remain readable. The much smaller reference error is
+stated in an annotation, rather than setting the bottom of the axis.
+
+Let F be the true step and F̂ the learned step. If eₙ is the current state error, then locally
+
+> eₙ₊₁ ≈ DF(sₙ)eₙ + [F̂(sₙ) − F(sₙ)].
+
+There are two contributions: propagation of an existing error, and a fresh approximation error.
+Training on correct states constrains the second term only where the training trajectories go.
+A rollout gradually supplies displaced states, so it also tests inputs unlike those used during
+fitting. Correlated errors can systematically change orbital phase, radius and energy.
+
+## 11.4 Failure modes and physical consistency
+
+**Figure 11.3 — `results/stage11_rollout_orbits.png`.** Read the learned path against the same
+reference ellipse in each panel. The representative linear rollout spirals inward; the polynomial
+rollout escapes; the forest gives the wrong radial envelope; and the MLP's orbit precesses.
+These are different manifestations of model bias, not four measurements of the same random noise.
+
+Across the ensemble, **45% of polynomial rollouts escape**. Stage 11 marks states beyond its
+100 AU radius threshold as non-finite and retains an explicit escape outcome in
+`results/stage11_rollout_per_orbit.csv`. For aggregate error curves the implementation substitutes
+100 AU after escape. This is a **failure penalty**, not a measured continuation of the trajectory
+or a mathematically exact lower bound on position error. The reported late-time polynomial mean
+therefore depends on that convention. The escape fraction and early tolerance crossings are the
+more interpretable measures of failure.
+
+**Figure 11.4 — `results/stage11_conservation_ml.png`.** Energy and angular-momentum errors
+provide checks independent of visual resemblance. A nearly elliptical path can still have the
+wrong energy or accumulate phase error. The learned models have no conservation constraint in
+their loss. The representative diagnostics are saved in
+`results/stage11_representative_rollout.csv`, so these checks remain inspectable without refitting.
+
+## 11.5 Direct prediction avoids recursion but still needs time coverage
+
+**Figure 11.5 — `results/stage11_direct_extrapolation.png`.** Use the full time curve, not only
+the summary average in `results/stage11_direct_map.csv`. The MLP's mean error is approximately
+0.004–0.006 AU over the densely covered interval from about 0.1 to 2.2 years. At t = 2 years it is
+**0.0064 AU**, compared with **0.6396 AU** for the recursive MLP, about a hundredfold difference.
+Sources: `results/stage11_direct_map_curve.csv` and `results/stage11_rollout_error.csv`.
+
+The training trajectories each contain three **orbits**, not three years. Short-period orbits
+near a = 0.8 AU stop near 2.15 years. Consequently, time coverage becomes uneven beyond about
+2.2 years even though the longest training trajectory continues later. The direct-map error rises
+to approximately 0.64 AU near 2.9 years and about 1.3 AU beyond 3.5 years. Its nominal
+“in-window” mean of 0.301 AU mixes dense coverage with this thinning region.
+
+Removing recursion therefore helps while the query is well supported by training data; it does
+not remove extrapolation failure. This is the orbital counterpart of Section 9.
+
+## 11.6 History, more data, and sensitivity
+
+**Figure 11.6 — `results/stage11_approach_comparison.png`.** The three-state history model
+finishes at 1.458 AU mean error for the forest and 1.885 AU for the MLP
+(`results/stage11_history.csv`). History provides no consistent improvement: the forest's final
+error is slightly smaller than its one-state result, but the MLP's is worse. Because the full
+position-and-velocity state already determines the future, extra history supplies redundancy,
+not a missing physical variable. These tests do not rule out other sequence architectures.
+
+**Figure 11.7 — `results/stage11_learning_curve.png`.** Increasing MLP training pairs from
+500 to about 44,000 lowers held-out one-step error from about 2.9 × 10⁻⁴ to 4.3 × 10⁻⁵ AU,
+but extends the 0.01 AU horizon only from about 0.08 to 0.25 years. The separate subset-training
+experiment need not reproduce the full-data horizon in Table 11.2. Linear and polynomial fits
+show little improvement, consistent with a limitation of their function classes.
+Source: `results/stage11_learning_curve.csv`.
+
+**Figure 11.8 — `results/stage11_sensitivity.png`.** Small perturbations of the exact orbital
+solution amplify by about 45–47 times over five years for the tested perturbations. The curves
+show phase separation consistent with linear secular growth, rather than a chaotic exponential
+instability. An exponential fit to a learned error curve is not a measurement of a physical
+Lyapunov exponent. This two-body benchmark supplies no basis for blaming chaos for model failure.
+
+## 11.7 What this stage establishes — and what it does not
+
+One-step position accuracy is insufficient to judge a learned simulator. Rollout horizons,
+escapes and conservation errors reveal failures that the one-step ranking conceals. Direct
+prediction can greatly reduce accumulated error within a well-covered domain; more data and
+short history alone do not reliably solve long-horizon prediction here.
+
+These are fixed, modest baseline models, not the best possible learned orbital simulators.
+No conservation architecture, rollout-aware loss or training-noise intervention was tested.
+The conclusions concern this implementation and these distributions; they do not prove that
+machine learning cannot approximate two-body dynamics accurately.
+
+---
+
+# 12. Stage 12 — The Controlled Comparison
+
+Comparing a projectile error in metres with an orbital error in AU would say little. Comparing
+a direct projectile prediction with a recursive orbital prediction would also mix two questions.
+This stage first holds the **flow-map formulation** fixed and then normalises the errors.
+
+## 12.1 Design and the controls actually implemented
+
+| Design element | Implementation |
+|---|---|
+| Independent variables | Physical system, model family, training rows and normalised prediction time |
+| Dependent variables | Relative position error, training and inference cost, sensitivity response |
+| Common formulation | Current four-component state → next state, trained on delta targets |
+| Common data volume | 20,000 training pairs per system; 20 separate rollout test trajectories |
+| Common models | Linear, polynomial degree 2, Random Forest and MLP with the existing fixed hyperparameters |
+| Position normalisation | Error / horizontal range for a flight; error / semi-major axis for an orbit |
+| Time normalisation | Time / flight duration or orbital period |
+| Sampling | Fixed 0.02 s projectile steps and 0.004 yr orbital steps; steps per natural timescale are **not matched** |
+| Horizon | One flight for projectiles; three orbital periods for planets; compare both at normalised time 1 |
+
+A flight duration is a natural timescale, not a periodic return. The finite projectile time grid
+may end slightly before landing; interpolation to normalised time 1 then uses the last sampled
+error. The comparison is therefore at approximately one complete flight.
+
+The one-step columns in `results/stage12_summary.csv` are evaluated on **training pairs**.
+Likewise, `results/stage12_learning_curves.csv` evaluates on the full training pool, which overlaps
+each fitted subset. Those are fit diagnostics, not independent generalisation measurements.
+The separate rollout trajectories provide the predictive comparison below. Stage 11 supplies
+held-out one-step measurements for the orbital problem.
+
+## 12.2 Results at one natural timescale
+
+**Table 12.1 — Mean dimensionless position error at one flight/orbit.**
+Source: `results/stage12_summary.csv`, column `relative_error_at_one_period`.
+
+| Model | Projectile | Planetary | Planetary / projectile |
+|---|---:|---:|---:|
+| Linear | **3.000 × 10⁻¹⁵** | 0.8641 | 2.88 × 10¹⁴ |
+| Polynomial, degree 2 | **1.159 × 10⁻¹⁰** | 0.8343 | 7.20 × 10⁹ |
+| Random Forest | **0.002878** | 0.2738 | 95.1 |
+| MLP | **0.001472** | 0.4303 | 292.3 |
+
+The forest reaches about **0.29% of a flight range**, versus **27.4% of an orbital semi-major
+axis**. Its orbital error is about 95 times larger. The MLP ratio is about 292. Ratios involving
+a denominator near round-off should not be interpreted as meaningful counts of extra accuracy
+digits; the important observation is exact representability of the projectile map.
+
+**Figure 12.1 — `results/stage12_flow_map_comparison.png`.** Compare the two panels at
+normalised time 1. The planet panel continues to three periods, while the flight panel stops
+at one. The logarithmic y-axis exposes the near-round-off linear projectile result as well as
+the much larger accumulated orbital errors.
+
+## 12.3 Why the difference follows from the equations
+
+For a fixed Δt the exact projectile state update is
+
+> x′ = x + vₓΔt;  y′ = y + vᵧΔt − ½gΔt²;
+> vₓ′ = vₓ;  vᵧ′ = vᵧ − gΔt.
+
+Every output is an affine function of the input state. Ordinary linear regression includes this
+function, so it can recover the map to numerical precision. This does not contradict Section 6:
+that section supplied launch speed, angle, height and time, whose mapping to position contains
+products and trigonometric functions. **The input representation changes what a linear model can
+express.** The polynomial fit also contains affine functions, but regularisation and numerical
+conditioning prevent identical round-off behaviour.
+
+Orbital acceleration instead depends on −GM r / |r|³. The finite-time flow map is nonlinear
+and is not supplied explicitly as a physical basis in these models. A low-degree polynomial
+can approximate it locally without enforcing the correct global geometry. A network can
+approximate nonlinear functions, but its fitted accuracy and stability are empirical questions.
+The result establishes a representational advantage for projectile motion; unmatched step counts,
+state distributions and different physical scales prevent attributing the entire numerical gap
+to one isolated factor.
+
+## 12.4 More data, sensitivity and cost
+
+**Figure 12.2 — `results/stage12_learning_curves.png`.** Training-set sizes are 500, 2,000,
+8,000 and 20,000 pairs. Read these as approximation-to-training-pool curves, with the overlap
+qualification in Section 12.1. They do not establish held-out sample efficiency. For independent
+learning-curve evidence use Stages 7 and 11.
+
+**Figure 12.3 — `results/stage12_sensitivity.png`.** The exact projectile is perturbed through
+launch speed, while the exact orbit is perturbed through semi-major axis. Their fractional
+parameter offsets are equal, but they are different perturbation directions, not identical
+state-space displacements. The figure compares those specified responses and is not a universal
+condition-number ranking. At one natural timescale the measured amplification is **1.414×**
+for the speed-perturbed projectile and **7.407×** for the semi-major-axis-perturbed orbit. Neither
+experiment supplies evidence of chaotic dynamics.
+Source: `results/stage12_sensitivity.csv`.
+
+**Figure 12.4 — `results/stage12_cost.png`.** Separate training time from recurring prediction
+cost. Learned inference is timed in batches, projectile physics is a vectorised analytic
+calculation, and the orbital baseline is a sequential RK4 calculation with reference substeps.
+The recorded classical costs are approximately **0.032 μs** per vectorised projectile position
+and **453 μs** per stored orbital step with reference substeps. Those workloads and accuracies differ. A smaller microseconds-per-prediction number alone does
+not establish a useful end-to-end speedup at a matched error tolerance. Timings in
+`results/stage12_summary.csv` are machine- and load-dependent measurements.
+
+**Figure 12.5 — `results/stage12_scorecard.png`.** This is a visual summary, not a statistical
+composite score. Criteria choose their own best model and normalisation. The representability
+row uses illustrative scores (1 and 0.05), not measured probabilities or accuracies. Consult
+Table 12.1 and the underlying CSVs for quantitative claims.
+
+Stage 12 declares escape relative to 50 times the mean test-system length, rather than using
+an AU threshold on metre-valued trajectories. Non-finite predictions receive that scale-based
+failure penalty. This preserves failed runs without confusing position units.
+
+## 12.5 What this stage establishes — and what it does not
+
+Under the implemented common model families, data volume and flow-map formulation, projectile
+rollouts are much more accurate in relative position than orbital rollouts. The affine projectile
+map explains why even the simplest fitted model can be effectively exact. Normalising the axes
+does not by itself equalise sampling or perturbation directions, and the training-pool diagnostics
+must not be described as test performance. A stricter follow-up would match Δt / natural timescale,
+use disjoint one-step evaluation trajectories for both arms, and compare computational cost at
+an equal accuracy target.
+
+---
+
+# PART III — SYNTHESIS
 
 ---
 
@@ -1905,480 +2180,250 @@ the point of the whole section: they are the only models that were told what the
    demonstration of the mechanism, not a recommendation to use a PINN for projectile motion.
 
 ---
-# 10. How To Reproduce This Project From Scratch
 
-A reader with no ML background should be able to rebuild this entire project by following these steps.
+# 14. General Discussion, Limitations and Conclusions
 
-**Step 1 — Install Python and the required libraries.**
-```bash
-python3 -m venv venv
-source venv/bin/activate          # on Windows: venv\Scripts\activate
-pip install numpy pandas scikit-learn matplotlib
-```
-A *virtual environment* keeps this project's libraries separate from the rest of your system, so that upgrading
-a package for another project cannot silently change your results.
+## 14.1 Answer to the research question
 
-**Step 2 — Create the folder structure.**
-```bash
-mkdir -p RM/data/generation RM/src RM/plots RM/results RM/docs
-cd RM
-```
+Machine learning approximates these motions with very different success depending on the input
+representation, training domain and prediction procedure. It performs well on interpolated
+projectile positions; its learned orbital flow maps lose accuracy under repeated application.
+Classical equations remain the accuracy baseline. The hard-constraint projectile fit matches
+that baseline because its features already encode the correct physical structure.
 
-**Step 3 — Write the physics and dataset generator.**
-Create `data/generation/projectileDataGeneration.py` with the code from Section 5, Stages 1 and 2, plus this
-entry point at the bottom:
-```python
-if __name__ == "__main__":
-    dataset = generateProjectileDataset(numSamples=2000)
-    print(dataset.head())
-    dataset.to_csv("../projectile_dataset.csv", index=False)
-    print(f"\nRows: {len(dataset)}, Columns: {list(dataset.columns)}")
-```
-The `if __name__ == "__main__":` guard means this block runs only when the file is executed directly, not when
-it is imported by another file.
-
-**Step 4 — Generate the dataset.**
-```bash
-cd data/generation
-python3 projectileDataGeneration.py
-cd ../..
-```
-✅ **Verify:** `data/projectile_dataset.csv` exists with 2,001 lines (2,000 rows + header) and no negative y values.
-
-**Step 5 — Write the plotting functions.**
-Create `plots/projectile_plots.py` — the full listing is in Appendix A.
-
-**Step 6 — Write the ML pipeline.**
-Create `src/projectile_ml.py` — the full listing is in Appendix A.
-
-**Step 7 — Run the experiment.**
-```bash
-python3 src/projectile_ml.py       # from the project root, not from src/
-```
-✅ **Verify:** the metrics printed match Table 1 exactly. Because every random seed is fixed, they should match to
-the last decimal place. If they do not, check that your dataset generation used `seed=42` and that your split used
-`random_state=42`.
-
-**Step 8 — Inspect the figures.**
-Open the three PNGs in `results/`. Confirm the diagonal clustering in Figure 1, the diagonal residual pattern in
-Figure 2, and the staircase Random Forest curve in Figure 3.
-
-**Step 9 — Proceed to Stage 7** using the design in Section 8.2.
-
-**Common problems:**
-
-| Symptom | Cause | Fix |
+| Question | Evidence | What follows |
 |---|---|---|
-| `FileNotFoundError: data/projectile_dataset.csv` | Ran the script from inside `src/` | Run from the project root |
-| `ModuleNotFoundError: plots` | The `sys.path.append` line is missing | Copy it from Section 5, Stage 3 |
-| Metrics differ from Table 1 | A seed is unset or different | Set `seed=42` and `random_state=42` everywhere |
-| Parabola looks wrong | Angle passed in degrees | Use `np.deg2rad()`; NumPy trig expects radians |
-| All y values negative after some point | `t` drawn from a fixed global range | Draw `t` per-sample from `[0, t_flightᵢ]` |
+| Can ordinary regression predict motion? | Forest projectile R² = **0.9924** for x (Section 6) | Yes, within the evaluated distribution; a score alone is not evidence of a physical law |
+| Does more data help? | Forest x RMSE falls to **2.05 m** at 10,000 rows (Section 8) | It helps a flexible model; it cannot repair an inadequate linear feature representation |
+| Does interpolation imply extrapolation? | MLP error rises **286×** with all variables outside the range (Section 9) | The training envelope is part of the result |
+| Does a small step error imply a long useful forecast? | MLP passes 0.01 AU in **0.372 yr** (Section 11) | Evaluate recursive rollouts and conservation explicitly |
+| Are the physical systems equally easy for these models? | Forest relative error differs by **95×** at one natural timescale (Section 12) | No, under these controls; affine representability explains an important part of the gap |
+| Can known physics reduce the data requirement? | Zero-label PINN: **1.392 ± 0.174 m**; extrapolation advantage **14.7×** (Section 13) | Physical constraints help most where labelled coverage is scarce |
+
+## 14.2 Representation, propagation and constraints
+
+The study separates three mechanisms. First, representation determines whether the target map
+can be expressed at all: linear regression fails on raw projectile launch parameters but succeeds
+on a state-to-state update or a suitable physics basis. Second, recursive prediction propagates
+both state error and fresh model error. Third, physical constraints restrict the functions a model
+can fit. A hard constraint gives an algebraic guarantee in the idealised system; a soft residual
+penalty encourages physical consistency without guaranteeing it everywhere.
+
+These mechanisms explain why a single “best model” ranking would be misleading. The polynomial
+orbital model wins one-step position accuracy yet often escapes during rollout. The direct MLP
+is strong in its densely covered time interval and poor beyond it. At 2,000 labels the PINN
+(0.429 ± 0.047 m) and plain network (0.364 ± 0.060 m) are comparable; physics regularisation is
+not an unconditional improvement at every data volume.
+
+## 14.3 Relation to the literature
+
+The supplied literature review provides the context for these results. Its discussions of
+Breiman (2001) and Hairer, Lubich and Wanner (2006) motivate tree behaviour and numerical
+conservation diagnostics. Raissi, Perdikaris and Karniadakis (2019) provides the physics-residual
+approach examined in Stage 13. The sections on learned simulators, Hamiltonian networks and
+Neural ODEs identify possible responses to the failure modes measured here.
+
+This project is a small controlled benchmark, not a replication of those large studies. In
+particular, an unconstrained model's conservation failure is not an experimental evaluation of
+a Hamiltonian network, and integrable two-body dynamics do not reproduce a chaotic three-body
+experiment. Bibliographic details and the scope of each comparison appear in Section 16 and
+[LITERATURE_REVIEW.md](LITERATURE_REVIEW.md).
+
+## 14.4 Limitations and the next experiment for each
+
+| Limitation | Consequence | Specific next experiment |
+|---|---|---|
+| Ideal noise-free synthetic data | No estimate of performance on measurement noise or unmodelled forces | Add controlled position noise and drag, then repeat independent tests |
+| Fixed hyperparameters and modest models | Results are baseline performance, not an architecture-wide limit | Tune on a validation set, retaining untouched test trajectories |
+| Integrable two-body system | No conclusion about chaotic forecasting | Introduce a defined three-body benchmark with independent reference-error checks |
+| Unequal normalised step sizes in Stage 12 | System gap includes sampling differences | Match Δt / natural timescale and test both arms on disjoint trajectories |
+| Overlapping Stage 12 learning-curve evaluation pool | Curves cannot measure independent generalisation | Replace that pool with held-out trajectory pairs |
+| Uneven direct-map time coverage | A single global time boundary hides local extrapolation | Train on a common time horizon or phase coordinate; report coverage by a and t |
+| Escape penalties and finite horizons | Late means depend on reporting conventions | Report survival fractions and censored horizons alongside multiple penalty choices |
+| Limited repetitions | Across-orbit spread is not uncertainty over all training seeds | Repeat Stage 11 and 12 training with several seeds and report seed-level variation |
+| Different timing workloads | Inference speed is not a matched-accuracy solver comparison | Benchmark end-to-end time at specified error tolerances |
+| Physics constraints use the correct ideal law | Advantage may shrink with a misspecified equation | Perturb g or introduce drag while retaining the old residual, then quantify bias |
+
+## 14.5 Conclusions
+
+1. Ordinary regression can fit motion data accurately without recovering a physical law.
+2. More data improves some approximations, while input representation sets fundamental limits
+   for the tested linear and polynomial models.
+3. Extrapolation, rollout error and conservation must be evaluated separately from an
+   interpolation score or one-step position error.
+4. The projectile state update is affine; its fitted linear accuracy is an expected consequence
+   of the equations. Orbital rollouts remain much harder for the tested unconstrained models.
+5. Known physics improves the low-data and uncovered-domain results here. The zero-label PINN
+   still receives the equation, initial-condition information and collocation points; it is not
+   learning without information.
+
+The contribution is an interpretable measurement of when the approximations work, when they fail,
+and which physical and statistical mechanisms account for those outcomes. It is not a claim
+that a black-box model discovered Newton's laws or superseded classical mechanics.
 
 ---
 
-# 11. References — Candidate Sources (To Be Verified)
+# 15. How To Reproduce This Project From Scratch
 
-**This section is not yet a completed literature review.** The following are genuine, well-known works that are
-appropriate starting points for the review stage. Every one must be located, read, and independently verified
-before being cited in the final report — do not cite anything from this list on the strength of its appearance
-here.
+Use the repository source files, rather than copying the historical teaching snippets in Section 5.
+From the repository root:
 
-**Software and methods**
-- Breiman, L. (2001). "Random Forests." *Machine Learning*, 45(1), 5–32. — the original Random Forest paper;
-  cite this for the algorithm described in Section 3.4.
-- Pedregosa, F. et al. (2011). "Scikit-learn: Machine Learning in Python." *Journal of Machine Learning Research*,
-  12, 2825–2830.
-- Harris, C. R. et al. (2020). "Array programming with NumPy." *Nature*, 585, 357–362.
-- Hunter, J. D. (2007). "Matplotlib: A 2D Graphics Environment." *Computing in Science & Engineering*, 9(3), 90–95.
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+python run_all.py --list
+python run_all.py
+```
 
-**Machine learning in physics**
-- Raissi, M., Perdikaris, P., & Karniadakis, G. E. (2019). "Physics-informed neural networks." *Journal of
-  Computational Physics*, 378, 686–707. — directly relevant to Stage 13 and to the Section 7.6 argument that
-  physical constraints should be built into the model rather than hoped for.
-- Karniadakis, G. E. et al. (2021). "Physics-informed machine learning." *Nature Reviews Physics*, 3, 422–440. —
-  a review; a good entry point to the field.
-- Greydanus, S., Dzamba, M., & Yosinski, J. (2019). "Hamiltonian Neural Networks." *NeurIPS 2019.* — models that
-  respect conservation laws by construction; relevant to the Part II energy-conservation diagnostic.
+On Windows activate with `.venv\Scripts\activate`. A full run takes approximately 49 minutes
+on the original machine; actual runtime varies. The driver runs datasets and experiments in
+dependency order, stops on failure and prints a final stage summary.
 
-**Machine learning for orbital and gravitational dynamics (Part II)**
-- Breen, P. G. et al. (2020). "Newton versus the machine: solving the chaotic three-body problem using deep
-  neural networks." *Monthly Notices of the Royal Astronomical Society*, 494(2), 2465–2470. — the closest
-  published analogue to Part II's research question.
-- Cranmer, M. et al. (2020). "Discovering Symbolic Models from Deep Learning with Inductive Biases."
-  *NeurIPS 2020.* — relevant to Section 7.3: recovering an actual equation rather than a black-box fit.
+```bash
+python run_all.py --only 8 13
+python run_all.py --skip 11 12
+python validate_project.py
+```
 
-**Physics textbooks**
-- Any standard undergraduate mechanics text (Kleppner & Kolenkow, *An Introduction to Mechanics*; or Taylor,
-  *Classical Mechanics*) for the derivations in Section 2.
+The final command performs fast structural and numerical sanity checks without retraining.
+Individual stage selection does not automatically run all prerequisites; use the full run for
+a fresh checkout. `data/` contains generated datasets and `results/` contains experiment tables
+and figures. Appendix D maps every delivered result artifact to its producing stage.
 
-For each source the review should record: what problem was studied, what method was used, what was found, how it
-relates to this project, and what gap remains.
+The dependencies are pinned to the versions recorded for the original study. Random seeds are
+fixed, but floating-point libraries and execution environments can cause small numerical changes.
+**Timing columns are measurements and will vary even on the same machine.** Byte-identical CSVs
+are therefore not a reproduction requirement. Compare scientific metrics at their reported
+precision and review any larger discrepancies.
 
 ---
 
-# Appendix A — Complete File Listings
+# 16. References
 
-These are the exact contents of the project files at commit `4702cf9`, reproduced verbatim so that the project can
-be rebuilt from this document alone.
+The bibliography below is drawn from the project's existing verified reference list. The
+companion [literature review](LITERATURE_REVIEW.md) explains each source's role and distinguishes
+its published findings from this project's experiments. No new citations were added during
+completion.
 
-## A.1 `data/generation/projectileDataGeneration.py`
 
-```python
-import numpy as np
-import matplotlib.pyplot as plt
-import pandas as pd
+Verified bibliographic details. Sorted alphabetically by first author.
 
+1. **Breen, P. G., Foley, C. N., Boekholt, T. & Portegies Zwart, S.** (2020). Newton versus the
+   machine: solving the chaotic three-body problem using deep neural networks. *Monthly Notices
+   of the Royal Astronomical Society*, **494**(2), 2465–2470.
+   DOI: [10.1093/mnras/staa713](https://doi.org/10.1093/mnras/staa713) · arXiv:1910.07291
 
-# -------------------- CONSTANTS --------------------
+2. **Breiman, L.** (2001). Random Forests. *Machine Learning*, **45**(1), 5–32.
+   DOI: [10.1023/A:1010933404324](https://doi.org/10.1023/A:1010933404324)
 
-g = 9.81  # acceleration due to gravity (m/s^2)
+3. **Brunton, S. L., Proctor, J. L. & Kutz, J. N.** (2016). Discovering governing equations from
+   data by sparse identification of nonlinear dynamical systems. *Proceedings of the National
+   Academy of Sciences*, **113**(15), 3932–3937.
+   DOI: [10.1073/pnas.1517384113](https://doi.org/10.1073/pnas.1517384113)
 
+4. **Chen, R. T. Q., Rubanova, Y., Bettencourt, J. & Duvenaud, D. K.** (2018). Neural Ordinary
+   Differential Equations. *Advances in Neural Information Processing Systems 31 (NeurIPS 2018)*,
+   6572–6583. arXiv:[1806.07366](https://arxiv.org/abs/1806.07366)
 
-# -------------------- FUNCTIONS --------------------
+5. **Cranmer, M., Greydanus, S., Hoyer, S., Battaglia, P., Spergel, D. & Ho, S.** (2020).
+   Lagrangian Neural Networks. *ICLR 2020 Workshop on Integration of Deep Neural Models and
+   Differential Equations*. arXiv:[2003.04630](https://arxiv.org/abs/2003.04630)
 
-def generateProjectileData(numSamples, v0, theta, y0):
-    """
-    Generate projectile motion data.
+6. **Greydanus, S., Dzamba, M. & Yosinski, J.** (2019). Hamiltonian Neural Networks. *Advances in
+   Neural Information Processing Systems 32 (NeurIPS 2019)*, 15353–15363.
+   arXiv:[1906.01563](https://arxiv.org/abs/1906.01563)
 
-    Parameters:
-        numSamples : Number of points in the trajectory
-        v0         : Initial velocity (m/s)
-        theta      : Launch angle (radians)
-        y0         : Initial height (m)
+7. **Hairer, E., Lubich, C. & Wanner, G.** (2006). *Geometric Numerical Integration:
+   Structure-Preserving Algorithms for Ordinary Differential Equations* (2nd ed.). Springer
+   Series in Computational Mathematics, Vol. 31. Springer.
+   DOI: [10.1007/3-540-30666-8](https://doi.org/10.1007/3-540-30666-8)
 
-    Returns:
-        pandas DataFrame containing time, x and y
-    """
+8. **Hornik, K., Stinchcombe, M. & White, H.** (1989). Multilayer feedforward networks are
+   universal approximators. *Neural Networks*, **2**(5), 359–366.
+   DOI: [10.1016/0893-6080(89)90020-8](https://doi.org/10.1016/0893-6080(89)90020-8)
 
-    # Calculate time of flight
-    timeOfFlight = (
-        v0 * np.sin(theta)
-        + np.sqrt(
-            (v0 * np.sin(theta)) ** 2
-            + 2 * g * y0
-        )
-    ) / g
+9. **Karniadakis, G. E., Kevrekidis, I. G., Lu, L., Perdikaris, P., Wang, S. & Yang, L.** (2021).
+   Physics-informed machine learning. *Nature Reviews Physics*, **3**(6), 422–440.
+   DOI: [10.1038/s42254-021-00314-5](https://doi.org/10.1038/s42254-021-00314-5)
 
-    # Generate time values
-    t = np.linspace(0, timeOfFlight, numSamples)
+10. **Kingma, D. P. & Ba, J.** (2015). Adam: A Method for Stochastic Optimization.
+    *3rd International Conference on Learning Representations (ICLR 2015)*.
+    arXiv:[1412.6980](https://arxiv.org/abs/1412.6980)
 
-    # Generate x(t)
-    x = v0 * np.cos(theta) * t
+11. **Lagaris, I. E., Likas, A. & Fotiadis, D. I.** (1998). Artificial neural networks for solving
+    ordinary and partial differential equations. *IEEE Transactions on Neural Networks*, **9**(5),
+    987–1000. DOI: [10.1109/72.712178](https://doi.org/10.1109/72.712178)
 
-    # Generate y(t)
-    y = (
-        y0
-        + v0 * np.sin(theta) * t
-        - 0.5 * g * t**2
-    )
+12. **Lam, R., Sanchez-Gonzalez, A., Willson, M., et al.** (2023). Learning skillful medium-range
+    global weather forecasting. *Science*, **382**(6677), 1416–1421.
+    DOI: [10.1126/science.adi2336](https://doi.org/10.1126/science.adi2336) · arXiv:2212.12794
 
-    # Create dataframe
-    df = pd.DataFrame({
-        "time": t,
-        "x": x,
-        "y": y
-    })
+13. **Pedregosa, F., Varoquaux, G., Gramfort, A., et al.** (2011). Scikit-learn: Machine Learning
+    in Python. *Journal of Machine Learning Research*, **12**, 2825–2830.
 
-    return df
+14. **Raissi, M., Perdikaris, P. & Karniadakis, G. E.** (2019). Physics-informed neural networks:
+    A deep learning framework for solving forward and inverse problems involving nonlinear partial
+    differential equations. *Journal of Computational Physics*, **378**, 686–707.
+    DOI: [10.1016/j.jcp.2018.10.045](https://doi.org/10.1016/j.jcp.2018.10.045)
 
+15. **Rein, H. & Liu, S.-F.** (2012). REBOUND: an open-source multi-purpose N-body code for
+    collisional dynamics. *Astronomy & Astrophysics*, **537**, A128.
+    DOI: [10.1051/0004-6361/201118085](https://doi.org/10.1051/0004-6361/201118085)
 
-def generateProjectileDataset(numSamples, seed=42):
-    """
-    Generate an ML-ready projectile dataset.
+16. **Sanchez-Gonzalez, A., Godwin, J., Pfaff, T., Ying, R., Leskovec, J. & Battaglia, P. W.**
+    (2020). Learning to Simulate Complex Physics with Graph Networks. *Proceedings of the 37th
+    International Conference on Machine Learning*, PMLR **119**, 8459–8468.
+    arXiv:[2002.09405](https://arxiv.org/abs/2002.09405)
 
-    Each row = one random (v0, theta, y0, t) input combination and
-    the resulting (x, y) position. Rows are independent samples, not
-    points along a single trajectory, so the model sees how x and y
-    vary WITH v0, theta, y0 -- not just with t.
+17. **Schmidt, M. & Lipson, H.** (2009). Distilling Free-Form Natural Laws from Experimental Data.
+    *Science*, **324**(5923), 81–85.
+    DOI: [10.1126/science.1165893](https://doi.org/10.1126/science.1165893)
 
-    Parameters:
-        numSamples : number of rows to generate
+18. **Verlet, L.** (1967). Computer "Experiments" on Classical Fluids. I. Thermodynamical
+    Properties of Lennard-Jones Molecules. *Physical Review*, **159**(1), 98–103.
+    DOI: [10.1103/PhysRev.159.98](https://doi.org/10.1103/PhysRev.159.98)
 
-    Returns:
-        pandas DataFrame with columns v0, theta, y0, t, x, y
-    """
+### Textbooks used for the physics and the statistics
 
-    rng = np.random.default_rng(seed)
+19. **Goldstein, H., Poole, C. & Safko, J.** (2002). *Classical Mechanics* (3rd ed.).
+    Addison-Wesley. — Lagrangian/Hamiltonian mechanics, the two-body reduction, orbital elements.
 
-    # Feature ranges -- keep them physically reasonable
-    v0 = rng.uniform(5, 50, numSamples)        # m/s
-    theta = rng.uniform(np.deg2rad(5), np.deg2rad(85), numSamples)  # rad
-    y0 = rng.uniform(0, 20, numSamples)        # m
+20. **Hastie, T., Tibshirani, R. & Friedman, J.** (2009). *The Elements of Statistical Learning*
+    (2nd ed.). Springer. — bias–variance decomposition, model selection, ensemble methods.
 
-    # Time of flight for each sample (when y returns to 0)
-    timeOfFlight = (
-        v0 * np.sin(theta)
-        + np.sqrt((v0 * np.sin(theta)) ** 2 + 2 * g * y0)
-    ) / g
+21. **Murray, C. D. & Dermott, S. F.** (1999). *Solar System Dynamics*. Cambridge University
+    Press. — Kepler's equation, orbital elements, the two-body problem.
 
-    # Pick t randomly within [0, timeOfFlight] for each sample
-    # so t is a feature too, not the sweep variable.
-    t = rng.uniform(0, timeOfFlight)
+22. **Press, W. H., Teukolsky, S. A., Vetterling, W. T. & Flannery, B. P.** (2007).
+    *Numerical Recipes: The Art of Scientific Computing* (3rd ed.). Cambridge University Press.
+    — Runge–Kutta methods, root finding (Newton–Raphson for Kepler's equation), finite differences.
 
-    x = v0 * np.cos(theta) * t
-    y = y0 + v0 * np.sin(theta) * t - 0.5 * g * t**2
-
-    df = pd.DataFrame({
-        "v0": v0,
-        "theta": theta,
-        "y0": y0,
-        "t": t,
-        "x": x,
-        "y": y
-    })
-
-    return df
-
-
-def plotProjectileData(dataset):
-    """
-    Plot the projectile trajectory.
-    """
-
-    plt.plot(
-        dataset["x"],
-        dataset["y"],
-        "o"
-    )
-
-    plt.xlabel("x (m)")
-    plt.ylabel("y (m)")
-    plt.title("Projectile Motion")
-
-    plt.grid(True)
-    plt.show()
-
-
-# -------------------- MAIN --------------------
-
-if __name__ == "__main__":
-
-    # Generate ML dataset: many random (v0, theta, y0, t) -> (x, y) rows
-    dataset = generateProjectileDataset(numSamples=2000)
-
-    # Display first few rows
-    print(dataset.head())
-
-    # Save dataset
-    dataset.to_csv(
-        "../projectile_dataset.csv",
-        index=False
-    )
-
-    print("\nDataset generated successfully.")
-    print("Saved to: ../projectile_dataset.csv")
-    print(f"Rows: {len(dataset)}, Columns: {list(dataset.columns)}")```
-
-## A.2 `src/projectile_ml.py`
-
-```python
-import sys
-from pathlib import Path
-
-import numpy as np
-import pandas as pd
-from sklearn.model_selection import train_test_split
-from sklearn.linear_model import LinearRegression
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
-
-# allow "from plots.projectile_plots import ..." when run from project root
-sys.path.append(str(Path(__file__).resolve().parent.parent))
-from plots.projectile_plots import (
-    plot_actual_vs_predicted,
-    plot_residuals,
-    plot_trajectory_comparison,
-)
-
-g = 9.81
-RESULTS_DIR = Path(__file__).resolve().parent.parent / "results"
-
-
-# -------------------- LOAD DATA --------------------
-
-dataset = pd.read_csv("data/projectile_dataset.csv")
-
-features = dataset[["v0", "theta", "y0", "t"]]
-targets = dataset[["x", "y"]]
-
-X_train, X_test, y_train, y_test = train_test_split(
-    features, targets, test_size=0.2, random_state=42
-)
-
-
-# -------------------- TRAIN MODELS --------------------
-
-linear_model = LinearRegression()
-linear_model.fit(X_train, y_train)
-linear_predictions = linear_model.predict(X_test)
-
-forest_model = RandomForestRegressor(n_estimators=100, random_state=42)
-forest_model.fit(X_train, y_train)
-forest_predictions = forest_model.predict(X_test)
-
-
-# -------------------- STAGE 5: METRICS --------------------
-
-def report_metrics(model_name, y_true, y_pred):
-    """
-    Print MAE, RMSE, R^2 for x and y separately.
-    y_true, y_pred: arrays/dataframes with columns [x, y] in that order.
-    """
-    y_true = np.asarray(y_true)
-    y_pred = np.asarray(y_pred)
-
-    print(f"\n--- {model_name} ---")
-    for i, label in enumerate(["x", "y"]):
-        mae = mean_absolute_error(y_true[:, i], y_pred[:, i])
-        rmse = np.sqrt(mean_squared_error(y_true[:, i], y_pred[:, i]))
-        r2 = r2_score(y_true[:, i], y_pred[:, i])
-        print(f"{label}: MAE={mae:.3f} m, RMSE={rmse:.3f} m, R2={r2:.4f}")
-
-
-print("=" * 50)
-print("STAGE 5 -- EVALUATION METRICS (on 400 held-out test rows)")
-print("=" * 50)
-
-report_metrics("Linear Regression", y_test, linear_predictions)
-report_metrics("Random Forest", y_test, forest_predictions)
-
-
-# -------------------- STAGE 6: VISUAL COMPARISON --------------------
-
-y_test_arr = np.asarray(y_test)
-
-plot_actual_vs_predicted(
-    y_test_arr, forest_predictions,
-    save_path=RESULTS_DIR / "actual_vs_predicted.png"
-)
-print(f"\nSaved: {RESULTS_DIR / 'actual_vs_predicted.png'}")
-
-residuals_linear = y_test_arr[:, 0] - linear_predictions[:, 0]
-residuals_forest = y_test_arr[:, 0] - forest_predictions[:, 0]
-
-plot_residuals(
-    y_test_arr[:, 0], residuals_linear, residuals_forest,
-    save_path=RESULTS_DIR / "residuals.png"
-)
-print(f"Saved: {RESULTS_DIR / 'residuals.png'}")
-
-
-def classical_trajectory(v0, theta, y0, t_array):
-    x = v0 * np.cos(theta) * t_array
-    y = y0 + v0 * np.sin(theta) * t_array - 0.5 * g * t_array**2
-    return x, y
-
-
-# pick one condition from the test set to compare against
-sample = X_test.iloc[0]
-v0_s, theta_s, y0_s = sample["v0"], sample["theta"], sample["y0"]
-
-time_of_flight = (
-    v0_s * np.sin(theta_s)
-    + np.sqrt((v0_s * np.sin(theta_s)) ** 2 + 2 * g * y0_s)
-) / g
-t_sweep = np.linspace(0, time_of_flight, 50)
-
-x_classical, y_classical = classical_trajectory(v0_s, theta_s, y0_s, t_sweep)
-
-sweep_features = pd.DataFrame({
-    "v0": v0_s, "theta": theta_s, "y0": y0_s, "t": t_sweep
-})
-forest_sweep_pred = forest_model.predict(sweep_features)
-linear_sweep_pred = linear_model.predict(sweep_features)
-
-plot_trajectory_comparison(
-    x_classical, y_classical,
-    forest_sweep_pred, linear_sweep_pred,
-    v0_s, theta_s, y0_s,
-    save_path=RESULTS_DIR / "trajectory_comparison.png"
-)
-print(f"Saved: {RESULTS_DIR / 'trajectory_comparison.png'}")
-```
-
-## A.3 `plots/projectile_plots.py`
-
-```python
-import numpy as np
-import matplotlib.pyplot as plt
-
-
-def plot_actual_vs_predicted(y_test_arr, forest_predictions, save_path):
-    """
-    Scatter: actual vs predicted x and y (Random Forest).
-    Points on the red dashed line = perfect prediction.
-    """
-    fig, axes = plt.subplots(1, 2, figsize=(10, 5))
-
-    axes[0].scatter(y_test_arr[:, 0], forest_predictions[:, 0], alpha=0.4, s=10)
-    axes[0].plot(
-        [y_test_arr[:, 0].min(), y_test_arr[:, 0].max()],
-        [y_test_arr[:, 0].min(), y_test_arr[:, 0].max()],
-        "r--", label="perfect prediction"
-    )
-    axes[0].set_xlabel("Actual x (m)")
-    axes[0].set_ylabel("Predicted x (m)")
-    axes[0].set_title("Random Forest: Actual vs Predicted x")
-    axes[0].legend()
-
-    axes[1].scatter(y_test_arr[:, 1], forest_predictions[:, 1], alpha=0.4, s=10, color="green")
-    axes[1].plot(
-        [y_test_arr[:, 1].min(), y_test_arr[:, 1].max()],
-        [y_test_arr[:, 1].min(), y_test_arr[:, 1].max()],
-        "r--", label="perfect prediction"
-    )
-    axes[1].set_xlabel("Actual y (m)")
-    axes[1].set_ylabel("Predicted y (m)")
-    axes[1].set_title("Random Forest: Actual vs Predicted y")
-    axes[1].legend()
-
-    plt.tight_layout()
-    plt.savefig(save_path)
-    plt.close(fig)
-
-
-def plot_residuals(actual_x, residuals_linear, residuals_forest, save_path):
-    """
-    Residual (actual - predicted) vs actual x, for both models.
-    Flat scatter around 0 = good. Fanning out = systematic bias.
-    """
-    plt.figure(figsize=(8, 5))
-    plt.scatter(actual_x, residuals_linear, alpha=0.4, s=10, label="Linear Regression")
-    plt.scatter(actual_x, residuals_forest, alpha=0.4, s=10, label="Random Forest")
-    plt.axhline(0, color="black", linewidth=1)
-    plt.xlabel("Actual x (m)")
-    plt.ylabel("Residual: actual x - predicted x (m)")
-    plt.title("Residuals vs Actual x")
-    plt.legend()
-    plt.tight_layout()
-    plt.savefig(save_path)
-    plt.close()
-
-
-def plot_trajectory_comparison(
-    x_classical, y_classical,
-    forest_sweep_pred, linear_sweep_pred,
-    v0, theta, y0,
-    save_path
-):
-    """
-    One fixed launch condition: classical parabola vs each model's
-    predicted trajectory swept over t.
-    """
-    plt.figure(figsize=(8, 5))
-    plt.plot(x_classical, y_classical, "k-", linewidth=2, label="Classical physics")
-    plt.plot(forest_sweep_pred[:, 0], forest_sweep_pred[:, 1], "g--", label="Random Forest")
-    plt.plot(linear_sweep_pred[:, 0], linear_sweep_pred[:, 1], "b:", label="Linear Regression")
-    plt.xlabel("x (m)")
-    plt.ylabel("y (m)")
-    plt.title(f"Trajectory comparison (v0={v0:.1f}, theta={theta:.2f} rad, y0={y0:.1f})")
-    plt.legend()
-    plt.grid(True)
-    plt.tight_layout()
-    plt.savefig(save_path)
-    plt.close()
-```
+23. **Taylor, J. R.** (2005). *Classical Mechanics*. University Science Books. — projectile
+    motion, the assumptions behind constant-g kinematics, central-force motion.
+
+
+---
+
+# Appendix A — Source File Index
+
+The repository is the authoritative executable source. Section 5 retains the original teaching
+walkthrough; those historical snippets are not a complete listing of the extended project.
+
+| Source | Purpose |
+|---|---|
+| [run_all.py](../run_all.py) | Reproduction driver in dependency order |
+| [validate_project.py](../validate_project.py) | Fast artifact and numerical sanity checks |
+| [requirements.txt](../requirements.txt) | Recorded dependency versions |
+| [data/generation/](../data/generation/) | Projectile and planetary dataset generators |
+| [src/projectile_ml.py](../src/projectile_ml.py) | Original projectile models and evaluation |
+| [src/models.py](../src/models.py) | Shared model factory and physics-basis model |
+| [src/evaluation.py](../src/evaluation.py) | Common error metrics |
+| [src/planetary_physics.py](../src/planetary_physics.py) | Integrators and independent Kepler reference |
+| [src/planetary_ml.py](../src/planetary_ml.py) | Flow-map, direct and history models; rollout diagnostics |
+| [src/pinn.py](../src/pinn.py) | NumPy network, physics residual, gradients and optimiser |
+| [experiments/](../experiments/) | Stage 7, 8, 10, 11, 12 and 13 experimental designs and runs |
+| [plots/](../plots/) | Shared figure style and per-stage plotting functions |
 
 ---
 
@@ -2503,3 +2548,143 @@ completed.*
 
 *All numerical results in this report were produced by executing the code in this repository on 10 September 2026.
 Figures referenced are the files in `results/` at commit `4702cf9`.*
+
+
+---
+
+# Appendix D — Index of Every Figure and Table
+
+## D.1 Result artifacts
+
+Every PNG figure and CSV result table is listed below. The stage determines its producing
+experiment in `experiments/`; the original three figures come from `src/projectile_ml.py`.
+Some schematic curves are calculated directly from the equations during plotting. CSVs containing
+rollout diagnostics retain non-finite escaped states deliberately.
+
+| Artifact | Type | Producing stage |
+|---|---|---|
+| [actual_vs_predicted.png](../results/actual_vs_predicted.png) | Figure | 3–6 |
+| [residuals.png](../results/residuals.png) | Figure | 3–6 |
+| [stage10_conservation.csv](../results/stage10_conservation.csv) | Data table | 10 |
+| [stage10_conservation.png](../results/stage10_conservation.png) | Figure | 10 |
+| [stage10_convergence.csv](../results/stage10_convergence.csv) | Data table | 10 |
+| [stage10_convergence.png](../results/stage10_convergence.png) | Figure | 10 |
+| [stage10_integrator_orbits.png](../results/stage10_integrator_orbits.png) | Figure | 10 |
+| [stage10_kepler_third_law.csv](../results/stage10_kepler_third_law.csv) | Data table | 10 |
+| [stage10_kepler_third_law.png](../results/stage10_kepler_third_law.png) | Figure | 10 |
+| [stage10_orbit_family.png](../results/stage10_orbit_family.png) | Figure | 10 |
+| [stage11_approach_comparison.csv](../results/stage11_approach_comparison.csv) | Data table | 11 |
+| [stage11_approach_comparison.png](../results/stage11_approach_comparison.png) | Figure | 11 |
+| [stage11_conservation_ml.png](../results/stage11_conservation_ml.png) | Figure | 11 |
+| [stage11_direct_extrapolation.png](../results/stage11_direct_extrapolation.png) | Figure | 11 |
+| [stage11_direct_map.csv](../results/stage11_direct_map.csv) | Data table | 11 |
+| [stage11_direct_map_curve.csv](../results/stage11_direct_map_curve.csv) | Data table | 11 |
+| [stage11_error_growth.png](../results/stage11_error_growth.png) | Figure | 11 |
+| [stage11_history.csv](../results/stage11_history.csv) | Data table | 11 |
+| [stage11_horizons.csv](../results/stage11_horizons.csv) | Data table | 11 |
+| [stage11_learning_curve.csv](../results/stage11_learning_curve.csv) | Data table | 11 |
+| [stage11_learning_curve.png](../results/stage11_learning_curve.png) | Figure | 11 |
+| [stage11_one_step_accuracy.csv](../results/stage11_one_step_accuracy.csv) | Data table | 11 |
+| [stage11_one_step_accuracy.png](../results/stage11_one_step_accuracy.png) | Figure | 11 |
+| [stage11_representative_rollout.csv](../results/stage11_representative_rollout.csv) | Data table | 11 |
+| [stage11_rollout_error.csv](../results/stage11_rollout_error.csv) | Data table | 11 |
+| [stage11_rollout_orbits.png](../results/stage11_rollout_orbits.png) | Figure | 11 |
+| [stage11_rollout_per_orbit.csv](../results/stage11_rollout_per_orbit.csv) | Data table | 11 |
+| [stage11_sensitivity.png](../results/stage11_sensitivity.png) | Figure | 11 |
+| [stage12_cost.png](../results/stage12_cost.png) | Figure | 12 |
+| [stage12_flow_map_comparison.png](../results/stage12_flow_map_comparison.png) | Figure | 12 |
+| [stage12_flow_map_curves.csv](../results/stage12_flow_map_curves.csv) | Data table | 12 |
+| [stage12_learning_curves.csv](../results/stage12_learning_curves.csv) | Data table | 12 |
+| [stage12_learning_curves.png](../results/stage12_learning_curves.png) | Figure | 12 |
+| [stage12_scorecard.csv](../results/stage12_scorecard.csv) | Data table | 12 |
+| [stage12_scorecard.png](../results/stage12_scorecard.png) | Figure | 12 |
+| [stage12_sensitivity.csv](../results/stage12_sensitivity.csv) | Data table | 12 |
+| [stage12_sensitivity.png](../results/stage12_sensitivity.png) | Figure | 12 |
+| [stage12_summary.csv](../results/stage12_summary.csv) | Data table | 12 |
+| [stage13_consistency_audit.csv](../results/stage13_consistency_audit.csv) | Data table | 13 |
+| [stage13_data_efficiency.csv](../results/stage13_data_efficiency.csv) | Data table | 13 |
+| [stage13_data_efficiency.png](../results/stage13_data_efficiency.png) | Figure | 13 |
+| [stage13_extrapolation.csv](../results/stage13_extrapolation.csv) | Data table | 13 |
+| [stage13_extrapolation.png](../results/stage13_extrapolation.png) | Figure | 13 |
+| [stage13_physics_residual.png](../results/stage13_physics_residual.png) | Figure | 13 |
+| [stage13_training_history.png](../results/stage13_training_history.png) | Figure | 13 |
+| [stage7_learning_curve.csv](../results/stage7_learning_curve.csv) | Data table | 7 |
+| [stage7_learning_curve.png](../results/stage7_learning_curve.png) | Figure | 7 |
+| [stage7_learning_curve_summary.csv](../results/stage7_learning_curve_summary.csv) | Data table | 7 |
+| [stage7_stability.png](../results/stage7_stability.png) | Figure | 7 |
+| [stage7_trajectory_by_datasize.png](../results/stage7_trajectory_by_datasize.png) | Figure | 7 |
+| [stage7_trajectory_error.csv](../results/stage7_trajectory_error.csv) | Data table | 7 |
+| [stage8_extrapolation_distance.csv](../results/stage8_extrapolation_distance.csv) | Data table | 8 |
+| [stage8_extrapolation_distance.png](../results/stage8_extrapolation_distance.png) | Figure | 8 |
+| [stage8_generalization.csv](../results/stage8_generalization.csv) | Data table | 8 |
+| [stage8_regime_bars.png](../results/stage8_regime_bars.png) | Figure | 8 |
+| [stage8_response_slice.csv](../results/stage8_response_slice.csv) | Data table | 8 |
+| [stage8_response_slice.png](../results/stage8_response_slice.png) | Figure | 8 |
+| [stage8_time_extrapolation.csv](../results/stage8_time_extrapolation.csv) | Data table | 8 |
+| [stage8_time_extrapolation.png](../results/stage8_time_extrapolation.png) | Figure | 8 |
+| [stage8_trajectories.png](../results/stage8_trajectories.png) | Figure | 8 |
+| [trajectory_comparison.png](../results/trajectory_comparison.png) | Figure | 3–6 |
+
+## D.2 Tables within this report
+
+This index includes design, results, interpretation and glossary tables in reading order.
+The section and first column identify each table; the artifact index above is not repeated here.
+
+| Table in reading order | Section | First column |
+|---|---|---|
+| D.1 | 1.4 Research Question | # |
+| D.2 | 2.3 Units and Physical Meaning | Symbol |
+| D.3 | 2.4 Assumptions and Their Limitations | Assumption |
+| D.4 | 4.2 Variables | Type |
+| D.5 | 4.2 Variables | **Independent** |
+| D.6 | 4.2 Variables | (unlabelled) |
+| D.7 | 4.2 Variables | **Dependent** |
+| D.8 | 4.2 Variables | **Controlled** |
+| D.9 | 4.2 Variables | (unlabelled) |
+| D.10 | 4.2 Variables | (unlabelled) |
+| D.11 | 4.2 Variables | (unlabelled) |
+| D.12 | 4.2 Variables | (unlabelled) |
+| D.13 | 4.3 Dataset Design — The Key Methodological Decision | Column |
+| D.14 | 4.5 Software Environment | Component |
+| D.15 | 6.1 Quantitative Model Performance | Model |
+| D.16 | 6.1 Quantitative Model Performance | Target |
+| D.17 | 6.2 Why Linear Regression Fails — and What It Nevertheless Got Right | Output |
+| D.18 | 6.4 Trajectory-Level Error vs Point-Wise Error — The Central Result | Model |
+| D.19 | 6.4 Trajectory-Level Error vs Point-Wise Error — The Central Result | Measurement mode |
+| D.20 | 7.2 Answering Sub-Question 2: ML vs Classical Physics | Criterion |
+| D.21 | 8.1 Design | Element |
+| D.22 | 8.2 Results | n_train |
+| D.23 | 8.2 Results | n_train |
+| D.24 | 9.2 Design | Element |
+| D.25 | 9.3 Results | Test regime |
+| D.26 | 9.3 Results | Test regime |
+| D.27 | 9.6 Extrapolating forward in time | t / t_flight |
+| D.28 | 10.1 The physics | Assumption |
+| D.29 | 10.3 Four integrators | Method |
+| D.30 | 10.4 Results: the orbit picture | Method |
+| D.31 | 10.5 Results: conservation over 200 orbits | Orbit |
+| D.32 | 10.5 Results: conservation over 200 orbits | circular (e = 0) |
+| D.33 | 10.5 Results: conservation over 200 orbits | (unlabelled) |
+| D.34 | 10.5 Results: conservation over 200 orbits | (unlabelled) |
+| D.35 | 10.5 Results: conservation over 200 orbits | eccentric (e = 0.6) |
+| D.36 | 10.5 Results: conservation over 200 orbits | (unlabelled) |
+| D.37 | 10.5 Results: conservation over 200 orbits | (unlabelled) |
+| D.38 | 10.6 Results: convergence order — verifying the implementation | Method |
+| D.39 | 10.7 Results: Kepler's third law emerges | a (AU) |
+| D.40 | 10.8 Computational cost | Method |
+| D.41 | 10.9 The error budget for Part II | Check |
+| D.42 | 11.1 Design | Design element |
+| D.43 | 11.2 One-step accuracy: predicting the change helps some models | Model |
+| D.44 | 11.3 Rollout: local accuracy is not a usable forecast horizon | Model |
+| D.45 | 12.1 Design and the controls actually implemented | Design element |
+| D.46 | 12.2 Results at one natural timescale | Model |
+| D.47 | 13. Stage 13 — Physics-Informed Machine Learning | Level |
+| D.48 | 13.1 Level (a) — hard constraints: fitting in a physics basis | (unlabelled) |
+| D.49 | Implementation notes (and why they are in the report) | Loss term |
+| D.50 | 13.4 Results: data efficiency | Labelled points |
+| D.51 | 13.5 Results: physics fills in where data runs out | Region |
+| D.52 | 13.6 Results: is the output physically possible? | Model |
+| D.53 | 14.1 Answer to the research question | Question |
+| D.54 | 14.4 Limitations and the next experiment for each | Limitation |
+| D.55 | Appendix A — Source File Index | Source |
+| D.56 | Appendix B — Glossary | Term |

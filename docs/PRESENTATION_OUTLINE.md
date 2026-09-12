@@ -75,11 +75,11 @@ Below, the two systems side by side:
 | | Projectile | Planetary |
 |---|---|---|
 | Governing law | ÿ = −g | **a** = −(GM/r³)**r** |
-| Solution | Closed form | No closed form for r(t) |
+| Solution | Elementary closed form | Analytic Kepler parametrisation with numerical root solve |
 | Ground truth | Exact algebra | RK4, validated to 10⁻¹³ AU |
 
-**Say:** "Two systems, chosen because they differ in exactly one important way: one has a
-closed-form solution and the other doesn't."
+**Say:** "These two systems have independently checkable answers. Their state updates differ
+structurally: the projectile update is affine, while the orbital update is nonlinear."
 
 ---
 
@@ -258,7 +258,9 @@ would be 'chaotic dynamics'. I checked, and it isn't — this system has no chao
   x′ = x + vₓΔt, y′ = y + v_yΔt − ½gΔt², vₓ′ = vₓ, v_y′ = v_y − gΔt
 - So plain linear regression recovers it to **10⁻¹⁴ m** — it lies exactly inside the hypothesis
   space of the simplest model tested.
-- The orbital flow map contains 1/r³ and lies inside **no** model's hypothesis space.
+- Orbital acceleration contains 1/r³; the tested fitted maps remain approximate.
+- Qualification: Stage 12 does not match steps per natural timescale, and its one-step
+  scores use training pairs. The separate rollout trajectories provide the prediction test.
 
 **Say:** "That's the answer to the comparative question, and it's structural rather than vague.
 It's not that orbits are 'more complicated' — it's that one flow map is inside the model class and
@@ -309,13 +311,13 @@ advantage disappears."
    by each model's inductive bias.
 3. In autoregressive prediction, **error accumulation**, not per-step accuracy, sets the usable
    horizon.
-4. Embedding physical law cuts the data requirement by roughly two orders of magnitude and makes
-   the output physically consistent.
+4. Embedding physical law improves low-data accuracy and the tested extrapolation; the soft
+   constraint does not guarantee exact motion or improve every high-data result.
 
 **What this study does not claim** (leave this on screen — it earns credibility):
 
 - ML did **not** beat classical physics here. It lost by ~10 orders of magnitude.
-- **No model discovered a law.** The two that got the physics exactly right were *handed* it.
+- **No model discovered a law.** The physics-basis fit is exact here; the PINN is approximate and receives the equation.
 - These are simulated, noise-free, non-chaotic systems.
 - The Stage 11 rollout numbers are a **baseline**, not state of the art — known improvements
   (noise injection, multi-step losses, Hamiltonian networks) were deliberately left out so the

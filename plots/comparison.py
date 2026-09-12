@@ -20,8 +20,7 @@ def plot_flow_map_comparison(curves, save_path):
     The controlled comparison the whole of Stage 12 is built around.
 
     IDENTICAL formulation (learn s_t -> s_{t+dt}, then feed the output back
-    in), IDENTICAL model families, IDENTICAL training procedure. The only
-    thing that changes between the two panels is the physics.
+    in), IDENTICAL model families, IDENTICAL training procedure. Sampling intervals and state distributions differ between systems.
 
     Errors are normalised by each system's own characteristic length -- the
     horizontal range of the flight, and the semi-major axis of the orbit --
@@ -53,7 +52,7 @@ def plot_flow_map_comparison(curves, save_path):
     fig.suptitle(
         "Stage 12: the same learned flow map, applied to two different physical systems\n"
         "Projectile: the exact flow map is AFFINE, so a linear model represents it exactly.  "
-        "Orbit: the flow map contains $1/r^3$ and no model contains it."
+        "Orbit: nonlinear acceleration; fitted flow maps remain approximate."
     )
     fig.tight_layout()
     save(fig, save_path, "the controlled system-vs-system comparison")
@@ -84,8 +83,8 @@ def plot_learning_curve_comparison(projectile, planetary, save_path):
     ax.set_xscale("log")
     ax.set_yscale("log")
     ax.set_xlabel("Training rows (log scale)")
-    ax.set_ylabel("Relative one-step error (log scale)")
-    ax.set_title("Learning curves, both systems\n(solid = projectile, dashed = planetary)")
+    ax.set_ylabel("Relative one-step error on training pool (log scale)")
+    ax.set_title("Training-pool fit curves (overlapping evaluation)\n(solid = projectile, dashed = planetary)")
     ax.legend(fontsize=7, ncol=2)
     readable_log_axes(ax)
 

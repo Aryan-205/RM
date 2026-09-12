@@ -25,7 +25,7 @@ Assumptions built into (9.1), all of which the report must state:
   * POINT MASSES: no tidal distortion, no oblateness (no J2 term).
   * NEWTONIAN: no general-relativistic precession, no finite speed of
     gravity. For Mercury this assumption is measurably wrong (43"/century);
-    for an Earth-like orbit it is far below our numerical error.
+    these physical corrections are deliberately outside this idealised benchmark.
   * No drag, no radiation pressure, no mass loss.
 
 UNITS
@@ -44,14 +44,13 @@ are ~1e11 m and ~1e30 kg, and squaring them inside an energy calculation
 throws away precision for no reason. In AU-year units every quantity in the
 simulation is of order 1.
 
-WHY WE NEED NUMERICAL INTEGRATION
-=================================
-Unlike projectile motion, (9.1) has no closed-form solution for r(t): the
-acceleration depends on the position, which is what we are solving for. The
-orbit SHAPE is solvable (it is a conic section -- Kepler), but the position
-AS A FUNCTION OF TIME requires solving Kepler's transcendental equation
-E - e sin E = M, which has no algebraic solution. So we step the system
-forward in small time increments instead. Stage 10 is about the fact that
+TWO ROUTES TO THE ORBITAL REFERENCE
+==================================
+The generic eccentric orbit has no elementary explicit expression for r(t).
+Its analytic Kepler parametrisation instead requires solving E - e sin E = M
+for the eccentric anomaly. That root solve gives position without time
+stepping. We also integrate the equations numerically and compare the two
+independent routes. Stage 10 is about the fact that
 HOW we take those steps matters enormously.
 """
 

@@ -75,7 +75,7 @@ def plot_one_step_accuracy(table, models, save_path):
     save(fig, save_path, "one-step accuracy and the delta trick")
 
 
-def plot_rollout_orbits(panels, n_orbits, save_path):
+def plot_rollout_orbits(panels, duration_years, save_path):
     """
     Each panel: one unseen orbit, the true trajectory in black, and the
     model's autoregressive rollout in colour, over the same time span.
@@ -113,7 +113,7 @@ def plot_rollout_orbits(panels, n_orbits, save_path):
         ax.legend(fontsize=7.5, loc="upper right")
 
     fig.suptitle(
-        f"Stage 11: {n_orbits:.1f}-orbit autoregressive rollout on an unseen orbit\n"
+        f"Stage 11: {duration_years:.1f}-year autoregressive rollout on an unseen orbit\n"
         f"(a = {panels[0]['a']:.3f} AU, e = {panels[0]['e']:.3f}; "
         "each model's own output is fed back in at every step)"
     )
@@ -131,11 +131,8 @@ def plot_error_growth(curves, models, numerical_error, thresholds, save_path):
     and a bending line means something slower (typically linear or quadratic
     accumulation of a biased step error).
 
-    The flat dotted line at the bottom is the RK4 reference's own error. The
-    gap between it and the learned curves -- around ten orders of magnitude at
-    the start -- is the honest statement of where machine learning stands
-    against a classical integrator on a problem whose equations we already
-    know.
+    The RK4 reference error is stated in an annotation below the learned
+    curves. The log-axis floor is kept at 1e-5 AU for readability.
 
     The right panel converts the same data into the number a user would
     actually ask for: for how long does this model stay within a given error

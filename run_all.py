@@ -3,8 +3,7 @@
 Reproduce the entire study from scratch.
 
 Regenerates every dataset, every results table and every figure, in dependency
-order. Because every random step in the project is seeded, a fresh run on the
-same machine reproduces the committed CSVs exactly.
+order. Because every random step in the project is seeded, seeded scientific metrics should reproduce within numerical tolerance; timing columns vary.
 
     python run_all.py                # everything
     python run_all.py --list         # show the stages and their runtimes

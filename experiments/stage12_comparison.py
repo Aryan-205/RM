@@ -18,8 +18,8 @@ This stage fixes both problems before comparing anything.
 
   1. FORMULATION HELD FIXED. Projectile motion is re-expressed as a one-step
      flow map s_t -> s_{t+dt}, exactly like the orbital problem (see
-     data/generation/projectileDataGeneration.py). Now the only difference
-     between the two arms is the physics.
+     data/generation/projectileDataGeneration.py). The systems still differ in sampling interval and state distribution;
+     these are limitations of the comparison.
 
   2. UNITS REMOVED. Every error is divided by the characteristic length of its
      own system (the horizontal range of the flight; the semi-major axis of
@@ -45,8 +45,10 @@ Experimental design
                           sensitivity amplification, training and inference time
   Controlled            : problem formulation (one-step flow map in both arms),
                           model hyperparameters, number of training rows,
-                          number of test trajectories, rollout length in units
-                          of the natural period, and the machine
+                          number of test trajectories, and the machine
+  Not matched           : steps per natural period; full rollout duration
+  Evaluation note       : one-step scores use training pairs; rollouts use
+                          separate test trajectories
 
 Run:  python experiments/stage12_comparison.py
 """
@@ -96,10 +98,9 @@ G = 9.81
 
 MODELS = ["linear", "poly2", "forest", "mlp"]
 
-# Both systems get the same number of training pairs and the same number of
-# steps per natural period, so neither is handicapped by the experimental setup.
+# Both systems get the same number of training pairs. Fixed physical time
+# steps imply different step counts per flight/orbit; report this limitation.
 N_TRAIN_PAIRS = 20000
-STEPS_PER_PERIOD = 250
 PERIODS_TO_ROLL = 3.0
 N_TEST_TRAJECTORIES = 20
 TRAIN_SIZES = [500, 2000, 8000, 20000]
